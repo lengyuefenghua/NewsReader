@@ -10,8 +10,10 @@ import org.jsoup.Jsoup
 
 object DebugHelper {
 
-    private const val UA_ANDROID = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
-    private const val UA_PC = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    private const val UA_ANDROID =
+        "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
+    private const val UA_PC =
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
     suspend fun runNewTest(context: Context, source: Source): String = withContext(Dispatchers.IO) {
         val sb = StringBuilder()
@@ -75,7 +77,12 @@ object DebugHelper {
 
     // 这里保留 testRssParsing 和 testCustomListParsing 方法，
     // 请直接复制之前文件中的这两个方法，不需要修改。
-    private fun testRssParsing(sb: StringBuilder, xml: String, source: Source, client: OkHttpClient) {
+    private fun testRssParsing(
+        sb: StringBuilder,
+        xml: String,
+        source: Source,
+        client: OkHttpClient
+    ) {
         try {
             val rssParser = RssParser()
             val items = rssParser.parse(xml.byteInputStream(), source.name)
@@ -105,10 +112,12 @@ object DebugHelper {
                 sb.append("✅ 找到 ${elements.size} 个列表项\n")
                 val first = elements.first()
                 val tRule = source.ruleTitle
-                val title = if (tRule.isNotBlank()) first.select(tRule).text() else first.text().take(50)
+                val title =
+                    if (tRule.isNotBlank()) first.select(tRule).text() else first.text().take(50)
                 sb.append("标题示例: $title\n")
                 val lRule = source.ruleLink
-                val link = if (lRule.isNotBlank()) first.select(lRule).attr("abs:href") else first.select("a").attr("abs:href")
+                val link = if (lRule.isNotBlank()) first.select(lRule)
+                    .attr("abs:href") else first.select("a").attr("abs:href")
                 sb.append("链接示例: $link\n")
             } else {
                 sb.append("❌ 未找到列表项。\n")

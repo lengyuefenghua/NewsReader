@@ -33,18 +33,25 @@ class StatsViewModel(application: Application) : AndroidViewModel(application) {
 
     private val now = System.currentTimeMillis()
 
-    val todayStats = dao.getReadStats(getStartTime(1), now).stateIn(viewModelScope, SharingStarted.Lazily, ReadStat(0, 0))
-    val weekStats = dao.getReadStats(getStartTime(2), now).stateIn(viewModelScope, SharingStarted.Lazily, ReadStat(0, 0))
-    val monthStats = dao.getReadStats(getStartTime(3), now).stateIn(viewModelScope, SharingStarted.Lazily, ReadStat(0, 0))
+    val todayStats = dao.getReadStats(getStartTime(1), now)
+        .stateIn(viewModelScope, SharingStarted.Lazily, ReadStat(0, 0))
+    val weekStats = dao.getReadStats(getStartTime(2), now)
+        .stateIn(viewModelScope, SharingStarted.Lazily, ReadStat(0, 0))
+    val monthStats = dao.getReadStats(getStartTime(3), now)
+        .stateIn(viewModelScope, SharingStarted.Lazily, ReadStat(0, 0))
+
     // [新增] 年度统计
-    val yearStats = dao.getReadStats(getStartTime(4), now).stateIn(viewModelScope, SharingStarted.Lazily, ReadStat(0, 0))
-    val totalStats = dao.getTotalReadStats().stateIn(viewModelScope, SharingStarted.Lazily, ReadStat(0, 0))
+    val yearStats = dao.getReadStats(getStartTime(4), now)
+        .stateIn(viewModelScope, SharingStarted.Lazily, ReadStat(0, 0))
+    val totalStats =
+        dao.getTotalReadStats().stateIn(viewModelScope, SharingStarted.Lazily, ReadStat(0, 0))
 
     // [新增] 图表数据流 (最近 7 天)
     val trendData: StateFlow<List<DayReadCount>> = dao.getDailyReadCounts(getStartTime(5))
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val sourceDetailStats = dao.getSourceDetailStats().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val sourceDetailStats = dao.getSourceDetailStats()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun formatDuration(millis: Long): String {
         val seconds = millis / 1000

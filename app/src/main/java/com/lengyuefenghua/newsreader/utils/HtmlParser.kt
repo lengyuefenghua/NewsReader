@@ -1,6 +1,5 @@
 package com.lengyuefenghua.newsreader.utils
 
-import android.util.Log
 import com.lengyuefenghua.newsreader.data.Article
 import com.lengyuefenghua.newsreader.data.Source
 import org.jsoup.Jsoup
@@ -52,7 +51,10 @@ class HtmlParser {
                             summary = summaryText, // 列表显示的文字
                             content = null,        // [关键修改] 设为 null，ArticleScreen 就会直接加载 URL
                             sourceName = source.name,
-                            pubDate = SimpleDateFormat("yyyy/MM/dd HH:mm", Locale.getDefault()).format(Date()),
+                            pubDate = SimpleDateFormat(
+                                "yyyy/MM/dd HH:mm",
+                                Locale.getDefault()
+                            ).format(Date()),
                             url = linkUrl
                         )
                     )

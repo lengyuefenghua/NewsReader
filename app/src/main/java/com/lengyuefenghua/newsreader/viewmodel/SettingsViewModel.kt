@@ -18,7 +18,11 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         .stateIn(viewModelScope, SharingStarted.Lazily, false)
 
     val cacheLimit = prefsRepo.cacheLimitFlow
-        .stateIn(viewModelScope, SharingStarted.Lazily, UserPreferencesRepository.DEFAULT_CACHE_LIMIT)
+        .stateIn(
+            viewModelScope,
+            SharingStarted.Lazily,
+            UserPreferencesRepository.DEFAULT_CACHE_LIMIT
+        )
 
     fun setAutoUpdate(enabled: Boolean) {
         viewModelScope.launch { prefsRepo.setAutoUpdate(enabled) }
@@ -32,7 +36,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             val limit = cacheLimit.value
             articleDao.cleanupCache(limit)
-            Toast.makeText(getApplication(), "缓存清理完成，保留最新 $limit 条", Toast.LENGTH_SHORT).show()
+            Toast.makeText(getApplication(), "缓存清理完成，保留最新 $limit 条", Toast.LENGTH_SHORT)
+                .show()
         }
     }
 }

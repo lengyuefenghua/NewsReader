@@ -38,12 +38,16 @@ class TimelineViewModel(application: Application) : AndroidViewModel(application
 
     private val _filterState = MutableStateFlow(FilterType.ALL)
     val filterState = _filterState.asStateFlow()
+
     // [新增] 源过滤器 (null 表示显示所有)
     private val _sourceFilter = MutableStateFlow<String?>(null)
+
     // 公开当前选中的源名称，用于 UI 标题显示
     val currentSourceName = _sourceFilter.asStateFlow()
+
     // [新增] 记录当前查看的源 ID，用于刷新时区分
     private var currentSourceId: Int? = null
+
     // [新增] 同步状态流
     private val _syncState = MutableStateFlow(SyncState())
     val syncState = _syncState.asStateFlow()
@@ -51,6 +55,7 @@ class TimelineViewModel(application: Application) : AndroidViewModel(application
     // [新增] 单次事件流 (用于 Toast)
     private val _toastEvent = Channel<String>()
     val toastEvent = _toastEvent.receiveAsFlow()
+
     // [核心修改] 使用 flatMapLatest 动态切换数据源
     @OptIn(ExperimentalCoroutinesApi::class)
     val articles: StateFlow<List<Article>> = _sourceFilter
@@ -90,7 +95,12 @@ class TimelineViewModel(application: Application) : AndroidViewModel(application
 
             if (targetSourceId != null && targetSourceName != null) {
                 // === 单源刷新模式 ===
-                _syncState.value = SyncState(isSyncing = true, current = 0, total = 1, currentSource = targetSourceName)
+                _syncState.value = SyncState(
+                    isSyncing = true,
+                    current = 0,
+                    total = 1,
+                    currentSource = targetSourceName
+                )
 
                 // 执行单源更新
                 repository.syncSource(targetSourceId)
@@ -100,7 +110,8 @@ class TimelineViewModel(application: Application) : AndroidViewModel(application
 
             } else {
                 // === 全局刷新模式 ===
-                _syncState.value = SyncState(isSyncing = true, current = 0, total = 0, currentSource = "准备中...")
+                _syncState.value =
+                    SyncState(isSyncing = true, current = 0, total = 0, currentSource = "准备中...")
                 repository.syncAll { current, total, name ->
                     _syncState.update {
                         it.copy(current = current, total = total, currentSource = name)
@@ -115,6 +126,7 @@ class TimelineViewModel(application: Application) : AndroidViewModel(application
     fun getArticleByUrl(url: String): Article? {
         return articles.value.find { it.url == url }
     }
+
     // [新增] 设置只显示特定源的文章
     fun showSource(sourceId: Int) {
         viewModelScope.launch {
@@ -128,10 +140,12 @@ class TimelineViewModel(application: Application) : AndroidViewModel(application
             }
         }
     }
+
     // [新增] 重置源过滤器 (显示所有)
     fun resetSourceFilter() {
         _sourceFilter.value = null
     }
+
     fun setFilter(type: FilterType) {
         currentSourceId = null // [新增] 清空 ID
         _filterState.value = type
@@ -142,21 +156,25 @@ class TimelineViewModel(application: Application) : AndroidViewModel(application
             repository.markArticleAsRead(id)
         }
     }
+
     // [新增] 更新阅读时长
     fun updateReadDuration(id: String, duration: Long) {
         viewModelScope.launch {
             repository.updateReadDuration(id, duration)
         }
     }
+
     fun toggleFavorite(article: Article) {
         viewModelScope.launch {
             repository.toggleFavorite(article.id, article.isFavorite)
         }
     }
+
     // [新增] 获取单篇文章的实时 Flow
     fun getArticleFlow(url: String): Flow<Article?> {
         return repository.getArticleFlow(url)
     }
+
     fun findSourceIdAndEdit(sourceName: String, onFound: (Int) -> Unit) {
         viewModelScope.launch {
             val id = repository.getSourceIdByName(sourceName)

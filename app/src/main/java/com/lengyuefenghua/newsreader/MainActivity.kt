@@ -8,33 +8,42 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Icon
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import com.lengyuefenghua.newsreader.ui.screens.ProfileScreen
-import com.lengyuefenghua.newsreader.ui.screens.SourceManagerScreen
-import com.lengyuefenghua.newsreader.ui.screens.TimelineScreen
-import java.net.URLEncoder
-import java.nio.charset.StandardCharsets
-import androidx.navigation.NavType
 import androidx.navigation.navArgument
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.lengyuefenghua.newsreader.data.UserPreferencesRepository
 import com.lengyuefenghua.newsreader.ui.screens.ArticleScreen
 import com.lengyuefenghua.newsreader.ui.screens.DebugConsoleScreen
 import com.lengyuefenghua.newsreader.ui.screens.EditSourceScreen
 import com.lengyuefenghua.newsreader.ui.screens.FavoritesScreen
+import com.lengyuefenghua.newsreader.ui.screens.ProfileScreen
 import com.lengyuefenghua.newsreader.ui.screens.SettingsScreen
+import com.lengyuefenghua.newsreader.ui.screens.SourceManagerScreen
 import com.lengyuefenghua.newsreader.ui.screens.StatsScreen
+import com.lengyuefenghua.newsreader.ui.screens.TimelineScreen
 import com.lengyuefenghua.newsreader.viewmodel.TimelineViewModel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -57,7 +66,8 @@ fun NewsReaderApp() {
     val timelineViewModel: TimelineViewModel = viewModel()
     val scope = rememberCoroutineScope()
     // 获取 Prefs Repo
-    val application = androidx.compose.ui.platform.LocalContext.current.applicationContext as NewsReaderApplication
+    val application =
+        androidx.compose.ui.platform.LocalContext.current.applicationContext as NewsReaderApplication
     val prefs = application.userPreferencesRepository
 
     // [新增] 自动更新逻辑
@@ -87,7 +97,9 @@ fun NewsReaderApp() {
                                     timelineViewModel.resetSourceFilter()
                                 }
                                 navController.navigate(screen.route) {
-                                    popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                    popUpTo(navController.graph.findStartDestination().id) {
+                                        saveState = true
+                                    }
                                     launchSingleTop = true
                                     restoreState = true
                                 }
@@ -172,16 +184,26 @@ fun NewsReaderApp() {
             composable("stats") {
                 StatsScreen(onBack = { navController.popBackStack() })
             }
-            composable("article/{url}", arguments = listOf(navArgument("url") { type = NavType.StringType })) { backStackEntry ->
+            composable(
+                "article/{url}",
+                arguments = listOf(navArgument("url") { type = NavType.StringType })
+            ) { backStackEntry ->
                 val url = backStackEntry.arguments?.getString("url") ?: ""
                 val initialArticle = remember { timelineViewModel.getArticleByUrl(url) }
-                val article by timelineViewModel.getArticleFlow(url).collectAsState(initial = initialArticle)
+                val article by timelineViewModel.getArticleFlow(url)
+                    .collectAsState(initial = initialArticle)
                 ArticleScreen(
                     article = article,
                     onBack = { navController.popBackStack() },
                     onMarkRead = { article?.let { timelineViewModel.markAsRead(it.id) } },
                     onToggleFavorite = { article?.let { timelineViewModel.toggleFavorite(it) } },
-                    onEditSource = { sourceName -> timelineViewModel.findSourceIdAndEdit(sourceName) { id -> navController.navigate("source_edit?id=$id") } },
+                    onEditSource = { sourceName ->
+                        timelineViewModel.findSourceIdAndEdit(sourceName) { id ->
+                            navController.navigate(
+                                "source_edit?id=$id"
+                            )
+                        }
+                    },
                     // [新增] 计时回调
                     onUpdateReadDuration = { id, duration ->
                         timelineViewModel.updateReadDuration(id, duration)
@@ -189,12 +211,22 @@ fun NewsReaderApp() {
                 )
             }
 
-            composable("source_edit?id={id}", arguments = listOf(navArgument("id") { type = NavType.IntType; defaultValue = -1 })) { backStackEntry ->
+            composable(
+                "source_edit?id={id}",
+                arguments = listOf(navArgument("id") { type = NavType.IntType; defaultValue = -1 })
+            ) { backStackEntry ->
                 val id = backStackEntry.arguments?.getInt("id") ?: -1
-                EditSourceScreen(sourceId = id, onBack = { navController.popBackStack() }, onSave = { navController.popBackStack() }, onDebug = { json -> navController.navigate("debug_console/$json") })
+                EditSourceScreen(
+                    sourceId = id,
+                    onBack = { navController.popBackStack() },
+                    onSave = { navController.popBackStack() },
+                    onDebug = { json -> navController.navigate("debug_console/$json") })
             }
 
-            composable("debug_console/{json}", arguments = listOf(navArgument("json") { type = NavType.StringType })) { backStackEntry ->
+            composable(
+                "debug_console/{json}",
+                arguments = listOf(navArgument("json") { type = NavType.StringType })
+            ) { backStackEntry ->
                 val json = backStackEntry.arguments?.getString("json") ?: ""
                 DebugConsoleScreen(sourceJson = json, onBack = { navController.popBackStack() })
             }

@@ -4,13 +4,55 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DoneAll
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.RemoveDone
+import androidx.compose.material.icons.filled.SelectAll
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.Divider
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -49,7 +91,9 @@ fun SourceManagerScreen(
                 TopAppBar(
                     title = { Text("已选择 ${selectedIds.size} 项") },
                     navigationIcon = {
-                        IconButton(onClick = { isSelectionMode = false; selectedIds.clear() }) { Icon(Icons.Default.Close, "取消") }
+                        IconButton(onClick = {
+                            isSelectionMode = false; selectedIds.clear()
+                        }) { Icon(Icons.Default.Close, "取消") }
                     },
                     actions = {
                         IconButton(onClick = {
@@ -59,15 +103,21 @@ fun SourceManagerScreen(
                             }
                         }) { Icon(Icons.Default.SelectAll, "全选") }
                         IconButton(onClick = {
-                            val selectedSources = sourceItems.filter { it.source.id in selectedIds }.map { it.source }
+                            val selectedSources =
+                                sourceItems.filter { it.source.id in selectedIds }.map { it.source }
                             val json = viewModel.exportSourcesToJson(selectedSources)
                             clipboardManager.setText(AnnotatedString(json))
-                            Toast.makeText(context, "已复制 ${selectedSources.size} 个源到剪贴板", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(
+                                context,
+                                "已复制 ${selectedSources.size} 个源到剪贴板",
+                                Toast.LENGTH_SHORT
+                            ).show()
                             isSelectionMode = false
                             selectedIds.clear()
                         }) { Icon(Icons.Default.Share, "导出") }
                         IconButton(onClick = {
-                            val selectedSources = sourceItems.filter { it.source.id in selectedIds }.map { it.source }
+                            val selectedSources =
+                                sourceItems.filter { it.source.id in selectedIds }.map { it.source }
                             viewModel.deleteSources(selectedSources)
                             isSelectionMode = false
                             selectedIds.clear()
@@ -86,7 +136,10 @@ fun SourceManagerScreen(
         }
     ) { innerPadding ->
         if (sourceItems.isEmpty()) {
-            Box(modifier = Modifier.fillMaxSize().padding(innerPadding), contentAlignment = Alignment.Center) {
+            Box(
+                modifier = Modifier.fillMaxSize().padding(innerPadding),
+                contentAlignment = Alignment.Center
+            ) {
                 Text("暂无订阅源，点击右下角添加")
             }
         } else {
@@ -109,10 +162,18 @@ fun SourceManagerScreen(
                         onDelete = { viewModel.deleteSource(item.source) },
                         onEdit = { onEditSource(item.source.id) },
                         onUpdate = {
-                            Toast.makeText(context, "开始更新: ${item.source.name}", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(
+                                context,
+                                "开始更新: ${item.source.name}",
+                                Toast.LENGTH_SHORT
+                            ).show()
                             viewModel.syncSource(item.source.id) {
                                 android.os.Handler(android.os.Looper.getMainLooper()).post {
-                                    Toast.makeText(context, "${item.source.name} 更新完成", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(
+                                        context,
+                                        "${item.source.name} 更新完成",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
                                 }
                             }
                         },
@@ -131,7 +192,9 @@ fun SourceManagerScreen(
                         },
                         onClick = {
                             if (isSelectionMode) {
-                                if (isSelected) selectedIds.remove(item.source.id) else selectedIds.add(item.source.id)
+                                if (isSelected) selectedIds.remove(item.source.id) else selectedIds.add(
+                                    item.source.id
+                                )
                             } else {
                                 onSourceClick(item.source.id)
                             }
@@ -192,7 +255,8 @@ fun SourceItem(
     val source = item.source
 
     Card(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp).combinedClickable(onClick = onClick, onLongClick = onLongClick),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick),
         colors = CardDefaults.cardColors(containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant)
     ) {
         Row(
@@ -208,7 +272,7 @@ fun SourceItem(
                 modifier = Modifier
                     .weight(1f)
                     .padding(end = 12.dp) // [新增] 强制留出右侧空间，防止文字与图标挤在一起
-            ){
+            ) {
                 Text(text = source.name, style = MaterialTheme.typography.titleMedium)
                 Text(text = source.url, style = MaterialTheme.typography.bodySmall, maxLines = 1)
 
@@ -221,15 +285,49 @@ fun SourceItem(
             }
             if (!isSelectionMode) {
                 Box {
-                    IconButton(onClick = { showMenu = true }) { Icon(Icons.Default.MoreVert, "更多") }
+                    IconButton(onClick = { showMenu = true }) {
+                        Icon(
+                            Icons.Default.MoreVert,
+                            "更多"
+                        )
+                    }
                     DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
-                        DropdownMenuItem(text = { Text("更新") }, onClick = { showMenu = false; onUpdate() }, leadingIcon = { Icon(Icons.Default.Refresh, null) })
-                        DropdownMenuItem(text = { Text("全部已读") }, onClick = { showMenu = false; onMarkAllRead() }, leadingIcon = { Icon(Icons.Default.DoneAll, null) })
-                        DropdownMenuItem(text = { Text("全部未读") }, onClick = { showMenu = false; onMarkAllUnread() }, leadingIcon = { Icon(Icons.Default.RemoveDone, null) })
+                        DropdownMenuItem(
+                            text = { Text("更新") },
+                            onClick = { showMenu = false; onUpdate() },
+                            leadingIcon = { Icon(Icons.Default.Refresh, null) })
+                        DropdownMenuItem(
+                            text = { Text("全部已读") },
+                            onClick = { showMenu = false; onMarkAllRead() },
+                            leadingIcon = { Icon(Icons.Default.DoneAll, null) })
+                        DropdownMenuItem(
+                            text = { Text("全部未读") },
+                            onClick = { showMenu = false; onMarkAllUnread() },
+                            leadingIcon = { Icon(Icons.Default.RemoveDone, null) })
                         Divider()
-                        DropdownMenuItem(text = { Text("分享") }, onClick = { showMenu = false; onShare() }, leadingIcon = { Icon(Icons.Default.Share, null) })
-                        DropdownMenuItem(text = { Text("编辑") }, onClick = { showMenu = false; onEdit() }, leadingIcon = { Icon(Icons.Default.Edit, null) })
-                        DropdownMenuItem(text = { Text("删除", color = MaterialTheme.colorScheme.error) }, onClick = { showMenu = false; onDelete() }, leadingIcon = { Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error) })
+                        DropdownMenuItem(
+                            text = { Text("分享") },
+                            onClick = { showMenu = false; onShare() },
+                            leadingIcon = { Icon(Icons.Default.Share, null) })
+                        DropdownMenuItem(
+                            text = { Text("编辑") },
+                            onClick = { showMenu = false; onEdit() },
+                            leadingIcon = { Icon(Icons.Default.Edit, null) })
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    "删除",
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            },
+                            onClick = { showMenu = false; onDelete() },
+                            leadingIcon = {
+                                Icon(
+                                    Icons.Default.Delete,
+                                    null,
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                            })
                     }
                 }
             }
@@ -284,7 +382,12 @@ fun SimpleAddDialog(
                 // 右侧：主要操作
                 Row {
                     TextButton(onClick = onDismiss) { Text("取消") }
-                    TextButton(onClick = { if (name.isNotBlank() && url.isNotBlank()) onConfirm(name, url) }) { Text("保存") }
+                    TextButton(onClick = {
+                        if (name.isNotBlank() && url.isNotBlank()) onConfirm(
+                            name,
+                            url
+                        )
+                    }) { Text("保存") }
                 }
             }
         }

@@ -4,7 +4,12 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -12,13 +17,27 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.SelectAll
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.lengyuefenghua.newsreader.data.Article
 import com.lengyuefenghua.newsreader.ui.components.ArticleCard
 import com.lengyuefenghua.newsreader.viewmodel.FavoritesViewModel
 
@@ -50,7 +69,9 @@ fun FavoritesScreen(
                 TopAppBar(
                     title = { Text("已选择 ${selectedIds.size} 项") },
                     navigationIcon = {
-                        IconButton(onClick = { isSelectionMode = false; selectedIds.clear() }) { Icon(Icons.Default.Close, "取消") }
+                        IconButton(onClick = {
+                            isSelectionMode = false; selectedIds.clear()
+                        }) { Icon(Icons.Default.Close, "取消") }
                     },
                     actions = {
                         IconButton(onClick = {
@@ -63,7 +84,13 @@ fun FavoritesScreen(
                             viewModel.removeFavorites(selectedIds.toList()) // 转换为 List 传入
                             isSelectionMode = false
                             selectedIds.clear()
-                        }) { Icon(Icons.Default.Delete, "删除", tint = MaterialTheme.colorScheme.error) }
+                        }) {
+                            Icon(
+                                Icons.Default.Delete,
+                                "删除",
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                        }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
                 )
@@ -72,14 +99,22 @@ fun FavoritesScreen(
                 Column {
                     TopAppBar(
                         title = { Text("我的收藏") },
-                        navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "返回") } }
+                        navigationIcon = {
+                            IconButton(onClick = onBack) {
+                                Icon(
+                                    Icons.Default.ArrowBack,
+                                    "返回"
+                                )
+                            }
+                        }
                     )
                     // [新增] 搜索栏
                     OutlinedTextField(
                         value = searchQuery,
                         onValueChange = { viewModel.updateSearchQuery(it) },
                         placeholder = { Text("搜索标题或内容...") },
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
                         singleLine = true
                     )
                 }
@@ -87,8 +122,14 @@ fun FavoritesScreen(
         }
     ) { innerPadding ->
         if (articles.isEmpty()) {
-            Box(modifier = Modifier.padding(innerPadding).fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(if (searchQuery.isEmpty()) "暂无收藏文章" else "未找到相关文章", color = MaterialTheme.colorScheme.outline)
+            Box(
+                modifier = Modifier.padding(innerPadding).fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    if (searchQuery.isEmpty()) "暂无收藏文章" else "未找到相关文章",
+                    color = MaterialTheme.colorScheme.outline
+                )
             }
         } else {
             LazyColumn(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
@@ -102,7 +143,9 @@ fun FavoritesScreen(
                             .combinedClickable(
                                 onClick = {
                                     if (isSelectionMode) {
-                                        if (isSelected) selectedIds.remove(article.id) else selectedIds.add(article.id)
+                                        if (isSelected) selectedIds.remove(article.id) else selectedIds.add(
+                                            article.id
+                                        )
                                     } else {
                                         onArticleClick(article.url)
                                     }
@@ -120,7 +163,11 @@ fun FavoritesScreen(
                         if (isSelectionMode) {
                             Checkbox(
                                 checked = isSelected,
-                                onCheckedChange = { if (isSelected) selectedIds.remove(article.id) else selectedIds.add(article.id) },
+                                onCheckedChange = {
+                                    if (isSelected) selectedIds.remove(article.id) else selectedIds.add(
+                                        article.id
+                                    )
+                                },
                                 modifier = Modifier.padding(start = 16.dp)
                             )
                         }

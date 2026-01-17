@@ -7,6 +7,7 @@ import com.lengyuefenghua.newsreader.utils.WebViewManager
 
 class NewsReaderApplication : Application() {
     val database by lazy { AppDatabase.getDatabase(this) }
+
     // [新增]
     lateinit var userPreferencesRepository: UserPreferencesRepository
 

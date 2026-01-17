@@ -4,10 +4,8 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
-import android.webkit.ConsoleMessage
-import android.webkit.WebChromeClient
-import android.webkit.WebResourceRequest
 import android.webkit.WebResourceError
+import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import kotlinx.coroutines.Dispatchers
@@ -28,6 +26,7 @@ import kotlin.coroutines.resume
 object WebViewManager {
 
     private var backgroundWebView: WebView? = null
+
     // 互斥锁：确保同一时间只有一个任务在使用这个全局 WebView
     private val mutex = Mutex()
     private val mainScope = MainScope()
@@ -44,7 +43,8 @@ object WebViewManager {
                         settings.javaScriptEnabled = true
                         settings.domStorageEnabled = true
                         settings.blockNetworkImage = true // 后台抓取不需要加载图片，提速省流
-                        settings.mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+                        settings.mixedContentMode =
+                            android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
 
                         // 关键：即使不可见，也要强行设置布局参数，否则某些网页 JS 不会执行
                         layout(0, 0, 1080, 1920)
@@ -75,53 +75,58 @@ object WebViewManager {
         }
     }
 
-    private suspend fun performFetch(url: String, ua: String): String = withContext(Dispatchers.Main) {
-        suspendCancellableCoroutine { continuation ->
-            val webView = backgroundWebView ?: run {
-                continuation.resume("ERROR: WebView 未初始化")
-                return@suspendCancellableCoroutine
-            }
-
-            var isResumed = false
-            fun safeResume(result: String) {
-                if (!isResumed && continuation.isActive) {
-                    isResumed = true
-                    continuation.resume(result)
-                }
-            }
-
-            // 配置本次请求的参数
-            webView.settings.userAgentString = ua
-
-            webView.webViewClient = object : WebViewClient() {
-                override fun onPageFinished(view: WebView?, url: String?) {
-                    super.onPageFinished(view, url)
-                    // 延迟 2 秒等待动态渲染 (如 36Kr)
-                    Handler(Looper.getMainLooper()).postDelayed({
-                        view?.evaluateJavascript("(function(){return document.documentElement.outerHTML})();") { value ->
-                            try {
-                                val rawHtml = JSONTokener(value).nextValue().toString()
-                                safeResume(rawHtml)
-                            } catch (e: Exception) {
-                                safeResume(value ?: "")
-                            }
-                        }
-                    }, 2000)
+    private suspend fun performFetch(url: String, ua: String): String =
+        withContext(Dispatchers.Main) {
+            suspendCancellableCoroutine { continuation ->
+                val webView = backgroundWebView ?: run {
+                    continuation.resume("ERROR: WebView 未初始化")
+                    return@suspendCancellableCoroutine
                 }
 
-                override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
-                    if (request?.isForMainFrame == true) {
-                        Log.e("WebViewManager", "加载出错: ${error?.description}")
-                        // 这里不立即 resume error，因为有些网站 404 也会触发 error 但内容是有的
-                        // 我们选择等待 onPageFinished 或超时
+                var isResumed = false
+                fun safeResume(result: String) {
+                    if (!isResumed && continuation.isActive) {
+                        isResumed = true
+                        continuation.resume(result)
                     }
                 }
-            }
 
-            Log.d("WebViewManager", "开始抓取: $url")
-            webView.loadUrl(url)
+                // 配置本次请求的参数
+                webView.settings.userAgentString = ua
+
+                webView.webViewClient = object : WebViewClient() {
+                    override fun onPageFinished(view: WebView?, url: String?) {
+                        super.onPageFinished(view, url)
+                        // 延迟 2 秒等待动态渲染 (如 36Kr)
+                        Handler(Looper.getMainLooper()).postDelayed({
+                            view?.evaluateJavascript("(function(){return document.documentElement.outerHTML})();") { value ->
+                                try {
+                                    val rawHtml = JSONTokener(value).nextValue().toString()
+                                    safeResume(rawHtml)
+                                } catch (e: Exception) {
+                                    safeResume(value ?: "")
+                                }
+                            }
+                        }, 2000)
+                    }
+
+                    override fun onReceivedError(
+                        view: WebView?,
+                        request: WebResourceRequest?,
+                        error: WebResourceError?
+                    ) {
+                        if (request?.isForMainFrame == true) {
+                            Log.e("WebViewManager", "加载出错: ${error?.description}")
+                            // 这里不立即 resume error，因为有些网站 404 也会触发 error 但内容是有的
+                            // 我们选择等待 onPageFinished 或超时
+                        }
+                    }
+                }
+
+                Log.d("WebViewManager", "开始抓取: $url")
+                webView.loadUrl(url)
+            }
         }
-    }
 
     private suspend fun cleanup() = withContext(Dispatchers.Main) {
         // 加载空页面，停止之前的 JS 执行，为下一次任务做清理

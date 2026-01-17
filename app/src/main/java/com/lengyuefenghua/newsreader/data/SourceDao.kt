@@ -1,6 +1,11 @@
 package com.lengyuefenghua.newsreader.data
 
-import androidx.room.*
+import androidx.room.Dao
+import androidx.room.Delete
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
+import androidx.room.Query
+import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -10,9 +15,11 @@ interface SourceDao {
 
     @Query("SELECT * FROM sources WHERE id = :id")
     suspend fun getSourceById(id: Int): Source?
+
     // 根据名称查找源 ID (用于文章页跳转)
     @Query("SELECT id FROM sources WHERE name = :name LIMIT 1")
     suspend fun getSourceIdByName(name: String): Int?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(source: Source)
 

@@ -1,29 +1,49 @@
 package com.lengyuefenghua.newsreader.ui.screens
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoGraph
-import androidx.compose.material.icons.filled.History
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.lengyuefenghua.newsreader.data.DayReadCount
 import com.lengyuefenghua.newsreader.data.ReadStat
 import com.lengyuefenghua.newsreader.data.SourceDetailStat
 import com.lengyuefenghua.newsreader.viewmodel.StatsViewModel
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StatsScreen(onBack: () -> Unit, viewModel: StatsViewModel = viewModel()) {
@@ -39,13 +59,25 @@ fun StatsScreen(onBack: () -> Unit, viewModel: StatsViewModel = viewModel()) {
         topBar = {
             TopAppBar(
                 title = { Text("阅读数据分析", fontWeight = FontWeight.Bold) },
-                navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "返回") } }
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            Icons.Default.ArrowBack,
+                            "返回"
+                        )
+                    }
+                }
             )
         }
     ) { innerPadding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(16.dp, innerPadding.calculateTopPadding() + 16.dp, 16.dp, 32.dp)
+            contentPadding = PaddingValues(
+                16.dp,
+                innerPadding.calculateTopPadding() + 16.dp,
+                16.dp,
+                32.dp
+            )
         ) {
             // 1. 阅读趋势图 (Canvas 手绘)
             item {
@@ -70,13 +102,23 @@ fun StatsScreen(onBack: () -> Unit, viewModel: StatsViewModel = viewModel()) {
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
                 ) {
-                    Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.AutoGraph, null, tint = MaterialTheme.colorScheme.primary)
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.AutoGraph,
+                            null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
                         Spacer(modifier = Modifier.width(12.dp))
                         Column {
                             Text("历史总阅读量", style = MaterialTheme.typography.labelSmall)
-                            Text("${total?.count ?: 0} 篇文章 / ${viewModel.formatDuration(total?.totalDuration ?: 0L)}",
-                                style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Text(
+                                "${total?.count ?: 0} 篇文章 / ${viewModel.formatDuration(total?.totalDuration ?: 0L)}",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
                     }
                 }
@@ -91,7 +133,11 @@ fun StatsScreen(onBack: () -> Unit, viewModel: StatsViewModel = viewModel()) {
 
             items(sourceDetails) { item ->
                 SourceRankRow(item, viewModel)
-                HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
+                HorizontalDivider(
+                    modifier = Modifier.padding(vertical = 12.dp),
+                    thickness = 0.5.dp,
+                    color = MaterialTheme.colorScheme.outlineVariant
+                )
             }
         }
     }
@@ -107,14 +153,24 @@ fun ReadingTrendChart(data: List<DayReadCount>) {
 
     Card(
         modifier = Modifier.fillMaxWidth().height(180.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(
+                alpha = 0.3f
+            )
+        )
     ) {
         if (data.size < 2) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("数据收集积累中...", color = labelColor, style = MaterialTheme.typography.bodySmall)
+                Text(
+                    "数据收集积累中...",
+                    color = labelColor,
+                    style = MaterialTheme.typography.bodySmall
+                )
             }
         } else {
-            Canvas(modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 24.dp)) {
+            Canvas(
+                modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 24.dp)
+            ) {
                 val width = size.width
                 val height = size.height
                 val maxCount = (data.maxOf { it.count }.coerceAtLeast(5)).toFloat()
@@ -148,17 +204,31 @@ fun ReadingTrendChart(data: List<DayReadCount>) {
 }
 
 @Composable
-fun StatRow(items: List<Pair<String, com.lengyuefenghua.newsreader.data.ReadStat?>>, viewModel: StatsViewModel) {
+fun StatRow(
+    items: List<Pair<String, ReadStat?>>,
+    viewModel: StatsViewModel
+) {
     Row(modifier = Modifier.fillMaxWidth()) {
         items.forEachIndexed { index, item ->
             Card(
                 modifier = Modifier.weight(1f),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f))
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(
+                        alpha = 0.7f
+                    )
+                )
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(item.first, style = MaterialTheme.typography.labelMedium)
-                    Text("${item.second?.count ?: 0} 篇", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    Text(viewModel.formatDuration(item.second?.totalDuration ?: 0L), style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        "${item.second?.count ?: 0} 篇",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        viewModel.formatDuration(item.second?.totalDuration ?: 0L),
+                        style = MaterialTheme.typography.bodySmall
+                    )
                 }
             }
             if (index < items.size - 1) Spacer(modifier = Modifier.width(12.dp))
@@ -178,9 +248,20 @@ fun SmallStatCard(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(title, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSecondaryContainer)
-            Text("${stat?.count ?: 0} 篇", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            Text(viewModel.formatDuration(stat?.totalDuration ?: 0L), style = MaterialTheme.typography.bodySmall)
+            Text(
+                title,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSecondaryContainer
+            )
+            Text(
+                "${stat?.count ?: 0} 篇",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                viewModel.formatDuration(stat?.totalDuration ?: 0L),
+                style = MaterialTheme.typography.bodySmall
+            )
         }
     }
 }
@@ -188,7 +269,8 @@ fun SmallStatCard(
 @Composable
 fun SourceRankRow(item: SourceDetailStat, viewModel: StatsViewModel) {
     // 计算阅读百分比
-    val progress = if (item.totalCount > 0) item.readCount.toFloat() / item.totalCount.toFloat() else 0f
+    val progress =
+        if (item.totalCount > 0) item.readCount.toFloat() / item.totalCount.toFloat() else 0f
 
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
@@ -196,7 +278,12 @@ fun SourceRankRow(item: SourceDetailStat, viewModel: StatsViewModel) {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(item.sourceName, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
+            Text(
+                item.sourceName,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.weight(1f)
+            )
             Text(
                 text = viewModel.formatDuration(item.totalReadDuration),
                 style = MaterialTheme.typography.bodyMedium,

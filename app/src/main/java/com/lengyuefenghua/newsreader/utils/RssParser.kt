@@ -222,7 +222,11 @@ class RssParser {
                     rawDate
                 }
             } catch (e2: Exception) {
-                try { rawDate.take(16) } catch (e3: Exception) { rawDate }
+                try {
+                    rawDate.take(16)
+                } catch (e3: Exception) {
+                    rawDate
+                }
             }
         }
     }
@@ -249,10 +253,12 @@ class RssParser {
                 XmlPullParser.TEXT -> {
                     sb.append(parser.text)
                 }
+
                 XmlPullParser.CDSECT -> {
                     hasCdata = true
                     sb.append(parser.text)
                 }
+
                 XmlPullParser.ENTITY_REF -> {
                     // 处理常见实体
                     val replacement = when (parser.name) {

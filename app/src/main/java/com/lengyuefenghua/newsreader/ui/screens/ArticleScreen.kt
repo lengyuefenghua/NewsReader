@@ -7,12 +7,41 @@ import android.net.Uri
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Toast
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Public
+import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.outlined.CheckCircle
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.BottomAppBar
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBarDefaults
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -60,17 +89,32 @@ fun ArticleScreen(
             TopAppBar(
                 title = {
                     Column {
-                        Text(article.title, maxLines = 1, style = MaterialTheme.typography.titleMedium)
-                        Text(article.sourceName, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+                        Text(
+                            article.title,
+                            maxLines = 1,
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        Text(
+                            article.sourceName,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.outline
+                        )
                     }
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, "返回") }
                 },
                 actions = {
-                    IconButton(onClick = { showMenu = true }) { Icon(Icons.Default.MoreVert, "更多") }
+                    IconButton(onClick = { showMenu = true }) {
+                        Icon(
+                            Icons.Default.MoreVert,
+                            "更多"
+                        )
+                    }
                     DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
-                        DropdownMenuItem(text = { Text("订阅设置") }, onClick = { showMenu = false; onEditSource(article.sourceName) })
+                        DropdownMenuItem(
+                            text = { Text("订阅设置") },
+                            onClick = { showMenu = false; onEditSource(article.sourceName) })
                         DropdownMenuItem(text = { Text("分享链接") }, onClick = {
                             showMenu = false
                             val sendIntent = Intent().apply {
@@ -97,21 +141,47 @@ fun ArticleScreen(
                 tonalElevation = NavigationBarDefaults.Elevation,
                 contentPadding = PaddingValues(0.dp)
             ) {
-                Row(modifier = Modifier.fillMaxSize(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = { viewMode = if (viewMode == 0) 1 else 0 }, enabled = article.content != null) {
-                        val icon = if (viewMode == 0) Icons.Default.Public else Icons.Default.Description
+                Row(
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(
+                        onClick = { viewMode = if (viewMode == 0) 1 else 0 },
+                        enabled = article.content != null
+                    ) {
+                        val icon =
+                            if (viewMode == 0) Icons.Default.Public else Icons.Default.Description
                         Icon(icon, contentDescription = "切换模式")
                     }
                     IconButton(onClick = onMarkRead) {
-                        Icon(imageVector = if (article.isRead) Icons.Default.CheckCircle else Icons.Outlined.CheckCircle, contentDescription = "已读", tint = if (article.isRead) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                        Icon(
+                            imageVector = if (article.isRead) Icons.Default.CheckCircle else Icons.Outlined.CheckCircle,
+                            contentDescription = "已读",
+                            tint = if (article.isRead) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                     IconButton(onClick = {
-                        if (!isTranslationEnabled) { isTranslationEnabled = true; injectTranslationScript(context, webViewRef); Toast.makeText(context, "正在启动沉浸式翻译...", Toast.LENGTH_SHORT).show() }
+                        if (!isTranslationEnabled) {
+                            isTranslationEnabled = true; injectTranslationScript(
+                                context,
+                                webViewRef
+                            ); Toast.makeText(context, "正在启动沉浸式翻译...", Toast.LENGTH_SHORT)
+                                .show()
+                        }
                     }) {
-                        Icon(Icons.Default.Translate, contentDescription = "翻译", tint = if (isTranslationEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                        Icon(
+                            Icons.Default.Translate,
+                            contentDescription = "翻译",
+                            tint = if (isTranslationEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                     IconButton(onClick = onToggleFavorite) {
-                        Icon(imageVector = if (article.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder, contentDescription = "收藏", tint = if (article.isFavorite) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
+                        Icon(
+                            imageVector = if (article.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                            contentDescription = "收藏",
+                            tint = if (article.isFavorite) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             }
@@ -145,7 +215,13 @@ fun ArticleScreen(
                             <style>body { font-family: sans-serif; line-height: 1.6; padding: 16px; color: #333; word-wrap: break-word; } img { max-width: 100%; height: auto; border-radius: 8px; margin: 10px 0; } p { margin-bottom: 16px; } a { color: #007AFF; text-decoration: none; }</style>
                             </head><body><h3>${article.title}</h3>${article.content}<div style="height: 200px;"></div></body></html>
                         """.trimIndent()
-                        if (webView.url == null || webView.url == "about:blank") webView.loadDataWithBaseURL(null, htmlData, "text/html", "UTF-8", null)
+                        if (webView.url == null || webView.url == "about:blank") webView.loadDataWithBaseURL(
+                            null,
+                            htmlData,
+                            "text/html",
+                            "UTF-8",
+                            null
+                        )
                     } else {
                         val currentUrl = webView.url
                         if (currentUrl != article.url) webView.loadUrl(article.url)
@@ -166,5 +242,7 @@ private fun injectTranslationScript(context: Context, webView: WebView?) {
         inputStream.close()
         val script = String(buffer)
         webView.evaluateJavascript("(function() { $script })(); void(0);", null)
-    } catch (e: Exception) { e.printStackTrace() }
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
 }

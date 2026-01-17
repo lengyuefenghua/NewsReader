@@ -25,21 +25,27 @@ class NewsRepository(private val database: AppDatabase) {
     val allArticles: Flow<List<Article>> = articleDao.getAllArticlesFlow()
 
     companion object {
-        const val UA_ANDROID = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
-        const val UA_PC = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        const val UA_ANDROID =
+            "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
+        const val UA_PC =
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
+
     // [新增] 获取特定源的文章流
     fun getArticlesBySource(sourceName: String): Flow<List<Article>> {
         return articleDao.getArticlesBySourceFlow(sourceName)
     }
+
     // [新增] 获取收藏文章流
     fun getFavoriteArticles(): Flow<List<Article>> {
         return articleDao.getFavoriteArticlesFlow()
     }
+
     // [新增] 获取单篇文章流，修复类型不匹配问题
     fun getArticleFlow(url: String): Flow<Article?> {
         return articleDao.getArticleFlow(url)
     }
+
     // [修改] syncAll 现在接受进度回调
     // onProgress: (finishedCount, totalCount, currentSourceName)
     suspend fun syncAll(onProgress: (Int, Int, String) -> Unit) = withContext(Dispatchers.IO) {
@@ -78,16 +84,20 @@ class NewsRepository(private val database: AppDatabase) {
     suspend fun markArticleAsRead(id: String) = withContext(Dispatchers.IO) {
         articleDao.markAsRead(id)
     }
+
     // [新增] 更新阅读时长
     suspend fun updateReadDuration(id: String, duration: Long) = withContext(Dispatchers.IO) {
         articleDao.updateReadDuration(id, duration)
     }
+
     suspend fun toggleFavorite(id: String, currentStatus: Boolean) = withContext(Dispatchers.IO) {
         articleDao.updateFavorite(id, !currentStatus)
     }
+
     suspend fun getSourceById(sourceId: Int): Source? = withContext(Dispatchers.IO) {
         sourceDao.getSourceById(sourceId)
     }
+
     suspend fun getSourceIdByName(name: String): Int? = withContext(Dispatchers.IO) {
         sourceDao.getSourceIdByName(name)
     }

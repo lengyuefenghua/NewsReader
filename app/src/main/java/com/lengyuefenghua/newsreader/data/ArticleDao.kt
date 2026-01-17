@@ -12,6 +12,7 @@ data class SourceStat(
     val totalCount: Int,
     val readCount: Int
 )
+
 // [新增] 统计结果 DTO
 data class ReadStat(
     val count: Int,
@@ -25,10 +26,12 @@ data class SourceDetailStat(
     val readCount: Int,
     val totalReadDuration: Long
 )
+
 data class DayReadCount(
     val day: String, // 格式如 "MM-dd"
     val count: Int
 )
+
 @Dao
 interface ArticleDao {
     @Query("SELECT * FROM articles ORDER BY pubDate DESC")
@@ -93,7 +96,8 @@ interface ArticleDao {
     suspend fun clearAll()
 
     // [新增] 缓存清理：保留最新的 limit 条，且不删除收藏的文章
-    @Query("""
+    @Query(
+        """
         DELETE FROM articles 
         WHERE isFavorite = 0 
         AND id NOT IN (
@@ -102,16 +106,20 @@ interface ArticleDao {
             ORDER BY pubDate DESC 
             LIMIT :limit
         )
-    """)
+    """
+    )
     suspend fun cleanupCache(limit: Int)
+
     // [新增] 获取最近 N 天每天的阅读量统计
-    @Query("""
+    @Query(
+        """
         SELECT strftime('%m-%d', datetime(readTimestamp / 1000, 'unixepoch', 'localtime')) as day, 
                COUNT(*) as count 
         FROM articles 
         WHERE isRead = 1 AND readTimestamp >= :startTime
         GROUP BY day 
         ORDER BY readTimestamp ASC
-    """)
+    """
+    )
     fun getDailyReadCounts(startTime: Long): Flow<List<DayReadCount>>
 }

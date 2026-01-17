@@ -5,7 +5,6 @@ import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.gson.GsonBuilder
-import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.lengyuefenghua.newsreader.NewsReaderApplication
 import com.lengyuefenghua.newsreader.data.NewsRepository
@@ -103,7 +102,9 @@ class SourceViewModel(application: Application) : AndroidViewModel(application) 
                     dao.insertAll(newSources)
                 }
                 validSources.size
-            } else { 0 }
+            } else {
+                0
+            }
         } catch (e: Exception) {
             e.printStackTrace()
             -1
@@ -115,12 +116,16 @@ class SourceViewModel(application: Application) : AndroidViewModel(application) 
             // 尝试解析为列表
             val listType = object : TypeToken<List<Source>>() {}.type
             gson.fromJson<List<Source>>(json, listType) ?: emptyList()
-        } catch (e: Exception) {
+        } catch (_: Exception) {
+            Log.d("user", "单条解析")
             try {
                 // 尝试解析为单个对象
                 val source = gson.fromJson(json, Source::class.java)
                 if (source != null) listOf(source) else emptyList()
-            } catch (e2: Exception) { emptyList() }
+            } catch (e2: Exception) {
+                Log.w("user", "JSON 解析失败", e2)
+                emptyList()
+            }
         }
     }
 }
