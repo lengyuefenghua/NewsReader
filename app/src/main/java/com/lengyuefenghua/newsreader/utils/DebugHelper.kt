@@ -15,7 +15,7 @@ object DebugHelper {
 
     suspend fun runNewTest(context: Context, source: Source): String = withContext(Dispatchers.IO) {
         val sb = StringBuilder()
-        sb.append("=== 调试报告 (全局加速版) ===\n")
+        sb.append("=== 调试日志 ===\n")
         sb.append("目标: ${source.name}\n")
         sb.append("URL: ${source.url}\n")
 
@@ -58,9 +58,6 @@ object DebugHelper {
 
             // 解析逻辑 (保持不变)
             if (html.isNotBlank()) {
-                if (html.contains("TTGCaptcha") || html.contains("验证码")) {
-                    sb.append("⚠️ 警告: 检测到验证码拦截！\n")
-                }
                 if (source.isCustom) {
                     testCustomListParsing(sb, html, source)
                 } else {

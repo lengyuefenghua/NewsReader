@@ -32,6 +32,14 @@ class NewsRepository(private val database: AppDatabase) {
     fun getArticlesBySource(sourceName: String): Flow<List<Article>> {
         return articleDao.getArticlesBySourceFlow(sourceName)
     }
+    // [新增] 获取收藏文章流
+    fun getFavoriteArticles(): Flow<List<Article>> {
+        return articleDao.getFavoriteArticlesFlow()
+    }
+    // [新增] 获取单篇文章流，修复类型不匹配问题
+    fun getArticleFlow(url: String): Flow<Article?> {
+        return articleDao.getArticleFlow(url)
+    }
     // [修改] syncAll 现在接受进度回调
     // onProgress: (finishedCount, totalCount, currentSourceName)
     suspend fun syncAll(onProgress: (Int, Int, String) -> Unit) = withContext(Dispatchers.IO) {
@@ -70,7 +78,10 @@ class NewsRepository(private val database: AppDatabase) {
     suspend fun markArticleAsRead(id: String) = withContext(Dispatchers.IO) {
         articleDao.markAsRead(id)
     }
-
+    // [新增] 更新阅读时长
+    suspend fun updateReadDuration(id: String, duration: Long) = withContext(Dispatchers.IO) {
+        articleDao.updateReadDuration(id, duration)
+    }
     suspend fun toggleFavorite(id: String, currentStatus: Boolean) = withContext(Dispatchers.IO) {
         articleDao.updateFavorite(id, !currentStatus)
     }

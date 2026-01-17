@@ -20,22 +20,54 @@ class RssParser {
     )
 
     fun parse(inputStream: InputStream, sourceName: String): List<Article> {
-        inputStream.use { stream ->
+        // [修改] 预处理步骤：读取流 -> 清洗特殊字符 -> 转回流
+        // 1. 读取原始内容
+        val rawContent = inputStream.bufferedReader().use { it.readText() }
+
+        // 2. 清洗数据：
+        // - 将不换行空格 (\u00a0) 替换为标准空格 (\u0020)
+        // - 去除首尾空白 (防止 <?xml 前有空格导致解析错误)
+        val sanitizedContent = rawContent.replace("\uFEFF", "")
+            .replace('\u00a0', ' ')
+            .trim()
+
+        // 3. 将清洗后的字符串转换为新的输入流
+        val sanitizedStream = sanitizedContent.byteInputStream()
+        sanitizedStream.use { stream ->
             val parser: XmlPullParser = Xml.newPullParser()
+            // 禁用命名空间处理，以便混用 rss/atom 标签时更简单（如 content:encoded）
             parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, false)
             parser.setInput(stream, null)
-            parser.nextTag()
-            return readFeed(parser, sourceName)
+
+            // 3. 智能查找根节点
+            var eventType = parser.eventType
+            while (eventType != XmlPullParser.END_DOCUMENT) {
+                if (eventType == XmlPullParser.START_TAG) {
+                    // 找到根节点（rss 或 feed）立即开始处理
+                    if (parser.name == "rss" || parser.name == "feed") {
+                        return readFeed(parser, sourceName)
+                    }
+                }
+                eventType = parser.next()
+            }
+            return emptyList()
         }
     }
 
+    // [修改] 兼容 RSS 的 <channel> 结构和 Atom 的直接 <entry> 结构
     private fun readFeed(parser: XmlPullParser, sourceName: String): List<Article> {
         val entries = mutableListOf<Article>()
-        parser.require(XmlPullParser.START_TAG, null, "rss")
+
         while (parser.next() != XmlPullParser.END_TAG) {
             if (parser.eventType != XmlPullParser.START_TAG) continue
+
+            // RSS 结构: rss -> channel -> item
             if (parser.name == "channel") {
                 entries.addAll(readChannel(parser, sourceName))
+            }
+            // Atom 结构: feed -> entry (直接在根节点下)
+            else if (parser.name == "entry") {
+                readEntry(parser, sourceName)?.let { entries.add(it) }
             } else {
                 skip(parser)
             }
@@ -56,8 +88,10 @@ class RssParser {
         return entries
     }
 
+    // [修改] 核心解析逻辑：同时兼容 RSS 标签和 Atom 标签
     private fun readEntry(parser: XmlPullParser, sourceName: String): Article? {
-        parser.require(XmlPullParser.START_TAG, null, "item")
+        // 移除严格的 require("item")，允许 "entry"
+
         var title: String? = null
         var pubDate: String? = null
         var link: String? = null
@@ -70,33 +104,57 @@ class RssParser {
 
         while (parser.next() != XmlPullParser.END_TAG) {
             if (parser.eventType != XmlPullParser.START_TAG) continue
-            when (parser.name) {
-                "title" -> title = readText(parser)
-                "link" -> link = readText(parser)
-                "pubDate" -> pubDate = readText(parser)
-                "description" -> {
+            val tagName = parser.name
+
+            when {
+                tagName == "title" -> title = readText(parser)
+
+                // 兼容链接：Atom (<link href="..."/>) 与 RSS (<link>...</link>)
+                tagName == "link" -> {
+                    val href = parser.getAttributeValue(null, "href")
+                    if (!href.isNullOrBlank()) {
+                        link = href // Atom 风格
+                        parser.nextTag() // 跳过空内容的结束标签 </link>
+                    } else {
+                        link = readText(parser) // RSS 风格
+                    }
+                }
+
+                // 兼容时间：Atom (published/updated) 与 RSS (pubDate)
+                tagName == "pubDate" || tagName == "published" || tagName == "updated" -> {
+                    // 优先取第一次读到的时间，或者是 published
+                    if (pubDate == null || tagName == "published") {
+                        pubDate = readText(parser)
+                    } else {
+                        skip(parser)
+                    }
+                }
+
+                // 兼容摘要：Atom (summary) 与 RSS (description)
+                tagName == "description" || tagName == "summary" -> {
                     val result = readTextAndCheckCdata(parser)
                     description = result.first
                     descriptionHasCdata = result.second
                 }
-                "content:encoded" -> {
+
+                // 兼容正文：Atom (content) 与 RSS (content:encoded)
+                tagName == "content:encoded" || tagName == "content" -> {
                     val result = readTextAndCheckCdata(parser)
                     contentEncoded = result.first
                     contentEncodedHasCdata = result.second
                 }
+
                 else -> skip(parser)
             }
         }
 
-        if (title == null || link == null) return null
+        if (title == null) return null
+        val finalLink = link ?: ""
 
-        // --- 核心逻辑调整 ---
+        // --- 以下正文/摘要判定逻辑保持不变 ---
 
-        // 判断 contentEncoded 是否可用（有 CDATA 或 包含块级HTML标签）
         val isContentEncodedValid = contentEncoded != null &&
                 (contentEncodedHasCdata || containsBlockTags(contentEncoded))
-
-        // 判断 description 是否可用
         val isDescriptionValid = description != null &&
                 (descriptionHasCdata || containsBlockTags(description))
 
@@ -110,33 +168,22 @@ class RssParser {
             rawBody = description!!
             isFullContent = true
         } else {
-            // 如果两者都没有“像正文”的特征，则回退到 description 用于生成摘要，但标记为非全文
             rawBody = description ?: contentEncoded ?: ""
             isFullContent = false
         }
 
-        val summary: String
-        val content: String?
-
-        // 生成摘要：去除 HTML 标签
-        summary = rawBody.replace(htmlTagRemoveRegex, "").trim().take(100) + "..."
-
-        if (isFullContent) {
-            content = rawBody
-        } else {
-            content = null
-        }
-
+        val summary = rawBody.replace(htmlTagRemoveRegex, "").trim().take(100) + "..."
+        val content = if (isFullContent) rawBody else null
         val displayDate = formatDate(pubDate)
 
         return Article(
-            id = link,
+            id = finalLink,
             title = title,
             summary = summary,
             content = content,
             sourceName = sourceName,
             pubDate = displayDate,
-            url = link
+            url = finalLink
         )
     }
 

@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -31,6 +33,7 @@ import com.lengyuefenghua.newsreader.viewmodel.TimelineViewModel
 fun TimelineScreen(
     viewModel: TimelineViewModel = viewModel(),
     title: String = "时间线",
+    onBack: (() -> Unit)? = null,
     onArticleClick: (String) -> Unit
 ) {
     val articles by viewModel.articles.collectAsState()
@@ -49,6 +52,13 @@ fun TimelineScreen(
         topBar = {
             TopAppBar(
                 title = { Text(title) },
+                navigationIcon = {
+                    if (onBack != null) {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.Default.ArrowBack, contentDescription = "返回")
+                        }
+                    }
+                },
                 actions = {
                     FilterChipGroup(
                         currentFilter = currentFilter,

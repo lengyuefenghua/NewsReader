@@ -8,6 +8,7 @@ import com.lengyuefenghua.newsreader.data.Article
 import com.lengyuefenghua.newsreader.data.NewsRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -50,7 +51,6 @@ class TimelineViewModel(application: Application) : AndroidViewModel(application
     // [新增] 单次事件流 (用于 Toast)
     private val _toastEvent = Channel<String>()
     val toastEvent = _toastEvent.receiveAsFlow()
-
     // [核心修改] 使用 flatMapLatest 动态切换数据源
     @OptIn(ExperimentalCoroutinesApi::class)
     val articles: StateFlow<List<Article>> = _sourceFilter
@@ -142,13 +142,21 @@ class TimelineViewModel(application: Application) : AndroidViewModel(application
             repository.markArticleAsRead(id)
         }
     }
-
+    // [新增] 更新阅读时长
+    fun updateReadDuration(id: String, duration: Long) {
+        viewModelScope.launch {
+            repository.updateReadDuration(id, duration)
+        }
+    }
     fun toggleFavorite(article: Article) {
         viewModelScope.launch {
             repository.toggleFavorite(article.id, article.isFavorite)
         }
     }
-
+    // [新增] 获取单篇文章的实时 Flow
+    fun getArticleFlow(url: String): Flow<Article?> {
+        return repository.getArticleFlow(url)
+    }
     fun findSourceIdAndEdit(sourceName: String, onFound: (Int) -> Unit) {
         viewModelScope.launch {
             val id = repository.getSourceIdByName(sourceName)

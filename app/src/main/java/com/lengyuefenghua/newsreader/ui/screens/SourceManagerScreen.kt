@@ -4,65 +4,23 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.SelectAll
-import androidx.compose.material.icons.filled.Share
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.lengyuefenghua.newsreader.data.Source
 import com.lengyuefenghua.newsreader.viewmodel.SourceViewModel
-import java.net.SocketImpl
-
-
+import com.lengyuefenghua.newsreader.viewmodel.SourceWithStat
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -72,18 +30,14 @@ fun SourceManagerScreen(
     onEditSource: (Int) -> Unit = {},
     onSourceClick: (Int) -> Unit = {}
 ) {
-    val sources by viewModel.sources.collectAsState()
+    val sourceItems by viewModel.sourcesWithStats.collectAsState()
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
 
-    // 多选状态
     var isSelectionMode by remember { mutableStateOf(false) }
     val selectedIds = remember { mutableStateListOf<Int>() }
-
-    // 弹窗状态
     var showSimpleDialog by remember { mutableStateOf(false) }
 
-    // 处理返回键：如果是多选模式，则退出多选
     BackHandler(enabled = isSelectionMode) {
         isSelectionMode = false
         selectedIds.clear()
@@ -95,37 +49,25 @@ fun SourceManagerScreen(
                 TopAppBar(
                     title = { Text("已选择 ${selectedIds.size} 项") },
                     navigationIcon = {
-                        IconButton(onClick = {
-                            isSelectionMode = false
-                            selectedIds.clear()
-                        }) { Icon(Icons.Default.Close, "取消") }
+                        IconButton(onClick = { isSelectionMode = false; selectedIds.clear() }) { Icon(Icons.Default.Close, "取消") }
                     },
                     actions = {
-                        // 全选
                         IconButton(onClick = {
-                            if (selectedIds.size == sources.size) {
+                            if (selectedIds.size == sourceItems.size) selectedIds.clear() else {
                                 selectedIds.clear()
-                            } else {
-                                selectedIds.clear()
-                                selectedIds.addAll(sources.map { it.id })
+                                selectedIds.addAll(sourceItems.map { it.source.id })
                             }
                         }) { Icon(Icons.Default.SelectAll, "全选") }
-                        // 导出选中
                         IconButton(onClick = {
-                            val selectedSources = sources.filter { it.id in selectedIds }
+                            val selectedSources = sourceItems.filter { it.source.id in selectedIds }.map { it.source }
                             val json = viewModel.exportSourcesToJson(selectedSources)
                             clipboardManager.setText(AnnotatedString(json))
-                            Toast.makeText(
-                                context,
-                                "已复制 ${selectedSources.size} 个源到剪贴板",
-                                Toast.LENGTH_SHORT
-                            ).show()
+                            Toast.makeText(context, "已复制 ${selectedSources.size} 个源到剪贴板", Toast.LENGTH_SHORT).show()
                             isSelectionMode = false
                             selectedIds.clear()
                         }) { Icon(Icons.Default.Share, "导出") }
-                        // 删除选中
                         IconButton(onClick = {
-                            val selectedSources = sources.filter { it.id in selectedIds }
+                            val selectedSources = sourceItems.filter { it.source.id in selectedIds }.map { it.source }
                             viewModel.deleteSources(selectedSources)
                             isSelectionMode = false
                             selectedIds.clear()
@@ -143,55 +85,46 @@ fun SourceManagerScreen(
             }
         }
     ) { innerPadding ->
-        if (sources.isEmpty()) {
-            Box(
-                modifier = Modifier.fillMaxSize().padding(innerPadding),
-                contentAlignment = Alignment.Center
-            ) {
+        if (sourceItems.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize().padding(innerPadding), contentAlignment = Alignment.Center) {
                 Text("暂无订阅源，点击右下角添加")
             }
         } else {
             LazyColumn(contentPadding = innerPadding, modifier = Modifier.fillMaxSize()) {
-                items(sources) { source ->
-                    val isSelected = selectedIds.contains(source.id)
+                items(sourceItems) { item ->
+                    val isSelected = selectedIds.contains(item.source.id)
                     SourceItem(
-                        source = source,
+                        item = item,
                         isSelectionMode = isSelectionMode,
                         isSelected = isSelected,
-                        onDelete = { viewModel.deleteSource(source) },
-                        onEdit = { onEditSource(source.id) },
+                        onDelete = { viewModel.deleteSource(item.source) },
+                        onEdit = { onEditSource(item.source.id) },
                         onUpdate = {
-                            Toast.makeText(context, "开始更新: ${source.name}", Toast.LENGTH_SHORT).show()
-                            viewModel.syncSource(source.id) {
-                                // 这是一个简化的回调，实际上建议使用 WorkManager 或 ViewModel 状态展示进度
-                                // 这里利用 Toast 简单提示完成
-                                // 注意：此回调在协程中，需确保在主线程操作 UI (Toast内部已处理)
-                                // 强制在主线程显示 Toast
+                            Toast.makeText(context, "开始更新: ${item.source.name}", Toast.LENGTH_SHORT).show()
+                            viewModel.syncSource(item.source.id) {
                                 android.os.Handler(android.os.Looper.getMainLooper()).post {
-                                    Toast.makeText(context, "${source.name} 更新完成", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, "${item.source.name} 更新完成", Toast.LENGTH_SHORT).show()
                                 }
                             }
                         },
                         onShare = {
-                            val json = viewModel.exportSourceToJson(source)
+                            val json = viewModel.exportSourceToJson(item.source)
                             clipboardManager.setText(AnnotatedString(json))
                             Toast.makeText(context, "已复制到剪贴板", Toast.LENGTH_SHORT).show()
                         },
+                        onMarkAllRead = { viewModel.markAllAsRead(item.source.name) },
+                        onMarkAllUnread = { viewModel.markAllAsUnread(item.source.name) },
                         onLongClick = {
                             if (!isSelectionMode) {
                                 isSelectionMode = true
-                                selectedIds.add(source.id)
+                                selectedIds.add(item.source.id)
                             }
                         },
                         onClick = {
                             if (isSelectionMode) {
-                                if (isSelected) selectedIds.remove(source.id) else selectedIds.add(
-                                    source.id
-                                )
+                                if (isSelected) selectedIds.remove(item.source.id) else selectedIds.add(item.source.id)
                             } else {
-                                // 非多选模式下的点击行为，暂时可以为空，或者进入编辑
-                                // 这里保持空，让用户点编辑按钮进入编辑
-                                onSourceClick(source.id)
+                                onSourceClick(item.source.id)
                             }
                         }
                     )
@@ -234,94 +167,70 @@ fun SourceManagerScreen(
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SourceItem(
-    source: Source,
+    item: SourceWithStat,
     isSelectionMode: Boolean,
     isSelected: Boolean,
     onDelete: () -> Unit,
     onEdit: () -> Unit,
     onUpdate: () -> Unit,
     onShare: () -> Unit,
+    onMarkAllRead: () -> Unit,
+    onMarkAllUnread: () -> Unit,
     onLongClick: () -> Unit,
     onClick: () -> Unit
 ) {
     var showMenu by remember { mutableStateOf(false) }
+    val source = item.source
+
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp)
-            .combinedClickable(
-                onClick = onClick,
-                onLongClick = onLongClick
-            ),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant
-        )
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp).combinedClickable(onClick = onClick, onLongClick = onLongClick),
+        colors = CardDefaults.cardColors(containerColor = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant)
     ) {
         Row(
             modifier = Modifier.padding(16.dp).fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // 多选模式下显示 Checkbox
             if (isSelectionMode) {
                 Checkbox(checked = isSelected, onCheckedChange = { onClick() })
                 Spacer(modifier = Modifier.width(8.dp))
             }
-
             Column(modifier = Modifier.weight(1f)) {
                 Text(text = source.name, style = MaterialTheme.typography.titleMedium)
                 Text(text = source.url, style = MaterialTheme.typography.bodySmall, maxLines = 1)
-                val modeText =
-                    if (source.isCustom) "自定义" else if (source.useAutoExtract || source.ruleContent.isNotBlank()) "RSS+正文" else "RSS"
+
+                val unread = item.total - item.read
                 Text(
-                    text = modeText,
+                    text = "已读 ${item.read} / 未读 $unread / 总计 ${item.total}",
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.tertiary
+                    color = if (unread > 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
                 )
             }
-
-            // [修改] 非多选模式下，显示三点菜单
             if (!isSelectionMode) {
                 Box {
-                    IconButton(onClick = { showMenu = true }) {
-                        Icon(Icons.Default.MoreVert, contentDescription = "更多")
-                    }
-                    DropdownMenu(
-                        expanded = showMenu,
-                        onDismissRequest = { showMenu = false }
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("更新") },
-                            onClick = { showMenu = false; onUpdate() },
-                            leadingIcon = { Icon(Icons.Default.Refresh, null) }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("分享") },
-                            onClick = { showMenu = false; onShare() },
-                            leadingIcon = { Icon(Icons.Default.Share, null) }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("编辑") },
-                            onClick = { showMenu = false; onEdit() },
-                            leadingIcon = { Icon(Icons.Default.Edit, null) }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("删除", color = MaterialTheme.colorScheme.error) },
-                            onClick = { showMenu = false; onDelete() },
-                            leadingIcon = { Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error) }
-                        )
+                    IconButton(onClick = { showMenu = true }) { Icon(Icons.Default.MoreVert, "更多") }
+                    DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                        DropdownMenuItem(text = { Text("更新") }, onClick = { showMenu = false; onUpdate() }, leadingIcon = { Icon(Icons.Default.Refresh, null) })
+                        DropdownMenuItem(text = { Text("全部已读") }, onClick = { showMenu = false; onMarkAllRead() }, leadingIcon = { Icon(Icons.Default.DoneAll, null) })
+                        DropdownMenuItem(text = { Text("全部未读") }, onClick = { showMenu = false; onMarkAllUnread() }, leadingIcon = { Icon(Icons.Default.RemoveDone, null) })
+                        Divider()
+                        DropdownMenuItem(text = { Text("分享") }, onClick = { showMenu = false; onShare() }, leadingIcon = { Icon(Icons.Default.Share, null) })
+                        DropdownMenuItem(text = { Text("编辑") }, onClick = { showMenu = false; onEdit() }, leadingIcon = { Icon(Icons.Default.Edit, null) })
+                        DropdownMenuItem(text = { Text("删除", color = MaterialTheme.colorScheme.error) }, onClick = { showMenu = false; onDelete() }, leadingIcon = { Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error) })
                     }
                 }
             }
         }
     }
 }
+
+// [修复] 还原为横向布局，左侧功能，右侧操作
 @Composable
 fun SimpleAddDialog(
     onDismiss: () -> Unit,
     onConfirm: (String, String) -> Unit,
     onSwitchToAdvanced: () -> Unit,
-    onImportFromClipboard: () -> Unit // 添加空函数作为默认值
+    onImportFromClipboard: () -> Unit
 ) {
     var name by remember { mutableStateOf("") }
     var url by remember { mutableStateOf("") }
@@ -335,38 +244,35 @@ fun SimpleAddDialog(
                     value = name,
                     onValueChange = { name = it },
                     label = { Text("名称") },
-                    singleLine = true
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 OutlinedTextField(
                     value = url,
                     onValueChange = { url = it },
                     label = { Text("RSS 地址") },
-                    singleLine = true
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
         },
         confirmButton = {
+            // [修复] 使用 Row + SpaceBetween 将按钮分组到两端
             Row(
-                Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                TextButton(onClick = onImportFromClipboard) {
-                    Text("剪贴板导入")
+                // 左侧：辅助功能
+                Row {
+                    TextButton(onClick = onImportFromClipboard) { Text("剪贴板导入") }
+                    TextButton(onClick = onSwitchToAdvanced) { Text("自定义") }
                 }
-                TextButton(onClick = onSwitchToAdvanced) {
-                    Text("自定义")
+                // 右侧：主要操作
+                Row {
+                    TextButton(onClick = onDismiss) { Text("取消") }
+                    TextButton(onClick = { if (name.isNotBlank() && url.isNotBlank()) onConfirm(name, url) }) { Text("保存") }
                 }
-                TextButton(onClick = onDismiss) {
-                    Text("取消")
-                }
-                TextButton(
-                    onClick = {
-                        if (name.isNotBlank() && url.isNotBlank()) {
-                            onConfirm(name, url)
-                        }
-                    }
-                ) { Text("保存") }
-
             }
         }
     )
