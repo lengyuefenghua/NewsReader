@@ -6,34 +6,58 @@ import androidx.lifecycle.viewModelScope
 import com.lengyuefenghua.newsreader.NewsReaderApplication
 import com.lengyuefenghua.newsreader.data.Article
 import com.lengyuefenghua.newsreader.data.NewsRepository
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+
+enum class FilterType {
+    ALL, UNREAD, READ
+}
+
+// [新增] 同步状态数据类
+data class SyncState(
+    val isSyncing: Boolean = false,
+    val current: Int = 0,
+    val total: Int = 0,
+    val currentSource: String = ""
+)
 
 class TimelineViewModel(application: Application) : AndroidViewModel(application) {
 
-    // 简单构建 Repository，实际项目中可以用 Hilt/Koin 注入
     private val repository = NewsRepository((application as NewsReaderApplication).database)
 
-    // 直接观察仓库的数据流，转换为 StateFlow 供 Compose 使用
-    // SharingStarted.Lazily 确保只有 UI 显示时才订阅数据库
-    val articles: StateFlow<List<Article>> = repository.allArticles
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.Lazily,
-            initialValue = emptyList()
-        )
+    private val _filterState = MutableStateFlow(FilterType.ALL)
+    val filterState = _filterState.asStateFlow()
 
-    private val _isLoading = MutableStateFlow(false)
-    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+    // [新增] 同步状态流
+    private val _syncState = MutableStateFlow(SyncState())
+    val syncState = _syncState.asStateFlow()
 
-    init {
-        // 启动时可以尝试自动同步一次，或者完全依赖手动刷新
-        // refresh()
-    }
+    // [新增] 单次事件流 (用于 Toast)
+    private val _toastEvent = Channel<String>()
+    val toastEvent = _toastEvent.receiveAsFlow()
+
+    val articles: StateFlow<List<Article>> = combine(
+        repository.allArticles,
+        _filterState
+    ) { allArticles, filter ->
+        when (filter) {
+            FilterType.ALL -> allArticles
+            FilterType.UNREAD -> allArticles.filter { !it.isRead }
+            FilterType.READ -> allArticles.filter { it.isRead }
+        }
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.Lazily,
+        initialValue = emptyList()
+    )
 
     fun fetchArticles() {
         refresh()
@@ -41,17 +65,50 @@ class TimelineViewModel(application: Application) : AndroidViewModel(application
 
     fun refresh() {
         viewModelScope.launch {
-            if (_isLoading.value) return@launch
+            if (_syncState.value.isSyncing) return@launch
 
-            _isLoading.value = true
-            // 执行后台同步任务，任务完成后，articles 流会自动更新，UI 也会自动刷新
-            repository.syncAll()
-            _isLoading.value = false
+            // 初始化状态
+            _syncState.value = SyncState(isSyncing = true, current = 0, total = 0, currentSource = "准备中...")
+
+            repository.syncAll { current, total, name ->
+                // 更新进度状态
+                _syncState.update {
+                    it.copy(current = current, total = total, currentSource = name)
+                }
+            }
+
+            // 完成
+            _syncState.value = SyncState(isSyncing = false)
+            _toastEvent.send("更新完成")
         }
     }
 
-    // 从当前内存列表中查找文章（如果还需要的话）
     fun getArticleByUrl(url: String): Article? {
         return articles.value.find { it.url == url }
+    }
+
+    fun setFilter(type: FilterType) {
+        _filterState.value = type
+    }
+
+    fun markAsRead(id: String) {
+        viewModelScope.launch {
+            repository.markArticleAsRead(id)
+        }
+    }
+
+    fun toggleFavorite(article: Article) {
+        viewModelScope.launch {
+            repository.toggleFavorite(article.id, article.isFavorite)
+        }
+    }
+
+    fun findSourceIdAndEdit(sourceName: String, onFound: (Int) -> Unit) {
+        viewModelScope.launch {
+            val id = repository.getSourceIdByName(sourceName)
+            if (id != null) {
+                onFound(id)
+            }
+        }
     }
 }

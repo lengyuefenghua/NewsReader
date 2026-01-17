@@ -15,40 +15,42 @@ import com.lengyuefenghua.newsreader.data.Article
 
 @Composable
 fun ArticleCard(article: Article, onClick: () -> Unit) {
+    // 根据已读状态决定文本颜色
+    val titleColor = if (article.isRead) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface
+    val summaryColor = if (article.isRead) MaterialTheme.colorScheme.outline.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onSurfaceVariant
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp)
-            .clickable { onClick() }, // 点击事件
+            .clickable { onClick() },
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
     ) {
         Column(
             modifier = Modifier.padding(16.dp)
         ) {
-            // 标题
             Text(
                 text = article.title,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 maxLines = 2,
-                overflow = TextOverflow.Ellipsis
+                overflow = TextOverflow.Ellipsis,
+                color = titleColor // [修改]
             )
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // 摘要
             Text(
                 text = article.summary,
                 style = MaterialTheme.typography.bodyMedium,
                 maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = summaryColor // [修改]
             )
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // 底部信息 (来源 + 时间)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween

@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.util.concurrent.atomic.AtomicInteger
 
 class NewsRepository(private val database: AppDatabase) {
 
@@ -21,7 +22,6 @@ class NewsRepository(private val database: AppDatabase) {
     private val rssParser = RssParser()
     private val htmlParser = HtmlParser()
 
-    // UI 层直接观察这个 Flow，数据库有变动会自动通知
     val allArticles: Flow<List<Article>> = articleDao.getAllArticlesFlow()
 
     companion object {
@@ -29,33 +29,51 @@ class NewsRepository(private val database: AppDatabase) {
         const val UA_PC = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
 
-    /**
-     * 触发一次全量同步：
-     * 1. 获取所有源
-     * 2. 并发抓取
-     * 3. 存入数据库
-     */
-    suspend fun syncAll() = withContext(Dispatchers.IO) {
-        // 获取当前订阅源快照 (使用 first() 取一次流的当前值)
+    // [修改] syncAll 现在接受进度回调
+    // onProgress: (finishedCount, totalCount, currentSourceName)
+    suspend fun syncAll(onProgress: (Int, Int, String) -> Unit) = withContext(Dispatchers.IO) {
         val sources = sourceDao.getAllSources().first()
+        if (sources.isEmpty()) return@withContext
 
-        // 并发执行抓取任务
+        val total = sources.size
+        val counter = AtomicInteger(0)
+
+        // 初始通知
+        onProgress(0, total, "准备开始...")
+
         val deferredResults = sources.map { source ->
             async {
+                // 开始前通知：正在更新 xxx
+                // 注意：由于并行执行，这里可能会快速刷新，UI 层展示其中一个即可
+                onProgress(counter.get(), total, source.name)
+
                 fetchAndSave(source)
+
+                // 完成后增加计数
+                val current = counter.incrementAndGet()
+                onProgress(current, total, source.name)
             }
         }
         deferredResults.awaitAll()
     }
 
-    /**
-     * 同步单个源（可用于添加新源时立即刷新）
-     */
     suspend fun syncSource(sourceId: Int) = withContext(Dispatchers.IO) {
-        val source = sourceDao.getSourceById(sourceId) // 假设 SourceDao 有这个方法，如果没有可以略过，或者用 getAllSources 过滤
+        val source = sourceDao.getSourceById(sourceId)
         if (source != null) {
             fetchAndSave(source)
         }
+    }
+
+    suspend fun markArticleAsRead(id: String) = withContext(Dispatchers.IO) {
+        articleDao.markAsRead(id)
+    }
+
+    suspend fun toggleFavorite(id: String, currentStatus: Boolean) = withContext(Dispatchers.IO) {
+        articleDao.updateFavorite(id, !currentStatus)
+    }
+
+    suspend fun getSourceIdByName(name: String): Int? = withContext(Dispatchers.IO) {
+        sourceDao.getSourceIdByName(name)
     }
 
     private suspend fun fetchAndSave(source: Source) {
@@ -79,7 +97,6 @@ class NewsRepository(private val database: AppDatabase) {
                 }
 
                 if (items.isNotEmpty()) {
-                    // 保存到数据库 (Insert OnConflictStrategy.IGNORE 会自动处理重复文章)
                     articleDao.insertArticles(items)
                     Log.d("NewsReader", "入库成功: ${source.name} 更新 ${items.size} 条")
                 }

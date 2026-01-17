@@ -10,5 +10,7 @@ data class Article(
     val content: String?,    // 正文
     val sourceName: String,  // 来源
     val pubDate: String,     // 发布时间
-    val url: String          // 原文链接
+    val url: String,          // 原文链接
+    val isRead: Boolean = false, // 是否已读
+    val isFavorite: Boolean = false // 是否收藏
 )
