@@ -7,6 +7,7 @@ import androidx.lifecycle.viewModelScope
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.lengyuefenghua.newsreader.NewsReaderApplication
+import com.lengyuefenghua.newsreader.data.NewsRepository
 import com.lengyuefenghua.newsreader.data.Source
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -16,6 +17,8 @@ import kotlinx.coroutines.launch
 class SourceViewModel(application: Application) : AndroidViewModel(application) {
 
     private val dao = (application as NewsReaderApplication).database.sourceDao()
+    private val repository = NewsRepository((application as NewsReaderApplication).database)
+
     private val gson = Gson()
 
     val sources: StateFlow<List<Source>> = dao.getAllSources()
@@ -28,7 +31,13 @@ class SourceViewModel(application: Application) : AndroidViewModel(application) 
     fun addSource(source: Source) {
         viewModelScope.launch { dao.insert(source) }
     }
-
+    // 更新单个源
+    fun syncSource(sourceId: Int, onFinished: () -> Unit = {}) {
+        viewModelScope.launch {
+            repository.syncSource(sourceId)
+            onFinished()
+        }
+    }
     fun deleteSource(source: Source) {
         viewModelScope.launch { dao.delete(source) }
     }

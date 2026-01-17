@@ -28,7 +28,10 @@ class NewsRepository(private val database: AppDatabase) {
         const val UA_ANDROID = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
         const val UA_PC = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
-
+    // [新增] 获取特定源的文章流
+    fun getArticlesBySource(sourceName: String): Flow<List<Article>> {
+        return articleDao.getArticlesBySourceFlow(sourceName)
+    }
     // [修改] syncAll 现在接受进度回调
     // onProgress: (finishedCount, totalCount, currentSourceName)
     suspend fun syncAll(onProgress: (Int, Int, String) -> Unit) = withContext(Dispatchers.IO) {
@@ -71,7 +74,9 @@ class NewsRepository(private val database: AppDatabase) {
     suspend fun toggleFavorite(id: String, currentStatus: Boolean) = withContext(Dispatchers.IO) {
         articleDao.updateFavorite(id, !currentStatus)
     }
-
+    suspend fun getSourceById(sourceId: Int): Source? = withContext(Dispatchers.IO) {
+        sourceDao.getSourceById(sourceId)
+    }
     suspend fun getSourceIdByName(name: String): Int? = withContext(Dispatchers.IO) {
         sourceDao.getSourceIdByName(name)
     }

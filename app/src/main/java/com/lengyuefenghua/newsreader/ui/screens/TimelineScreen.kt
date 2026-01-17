@@ -30,6 +30,7 @@ import com.lengyuefenghua.newsreader.viewmodel.TimelineViewModel
 @Composable
 fun TimelineScreen(
     viewModel: TimelineViewModel = viewModel(),
+    title: String = "时间线",
     onArticleClick: (String) -> Unit
 ) {
     val articles by viewModel.articles.collectAsState()
@@ -47,7 +48,7 @@ fun TimelineScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("时间线") },
+                title = { Text(title) },
                 actions = {
                     FilterChipGroup(
                         currentFilter = currentFilter,

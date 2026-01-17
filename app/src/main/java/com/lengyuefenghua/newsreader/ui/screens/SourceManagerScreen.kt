@@ -21,12 +21,16 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -65,7 +69,8 @@ import java.net.SocketImpl
 fun SourceManagerScreen(
     viewModel: SourceViewModel = viewModel(),
     onOpenAdvanced: () -> Unit = {},
-    onEditSource: (Int) -> Unit = {}
+    onEditSource: (Int) -> Unit = {},
+    onSourceClick: (Int) -> Unit = {}
 ) {
     val sources by viewModel.sources.collectAsState()
     val context = LocalContext.current
@@ -155,6 +160,18 @@ fun SourceManagerScreen(
                         isSelected = isSelected,
                         onDelete = { viewModel.deleteSource(source) },
                         onEdit = { onEditSource(source.id) },
+                        onUpdate = {
+                            Toast.makeText(context, "开始更新: ${source.name}", Toast.LENGTH_SHORT).show()
+                            viewModel.syncSource(source.id) {
+                                // 这是一个简化的回调，实际上建议使用 WorkManager 或 ViewModel 状态展示进度
+                                // 这里利用 Toast 简单提示完成
+                                // 注意：此回调在协程中，需确保在主线程操作 UI (Toast内部已处理)
+                                // 强制在主线程显示 Toast
+                                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                                    Toast.makeText(context, "${source.name} 更新完成", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        },
                         onShare = {
                             val json = viewModel.exportSourceToJson(source)
                             clipboardManager.setText(AnnotatedString(json))
@@ -174,6 +191,7 @@ fun SourceManagerScreen(
                             } else {
                                 // 非多选模式下的点击行为，暂时可以为空，或者进入编辑
                                 // 这里保持空，让用户点编辑按钮进入编辑
+                                onSourceClick(source.id)
                             }
                         }
                     )
@@ -221,10 +239,12 @@ fun SourceItem(
     isSelected: Boolean,
     onDelete: () -> Unit,
     onEdit: () -> Unit,
+    onUpdate: () -> Unit,
     onShare: () -> Unit,
     onLongClick: () -> Unit,
     onClick: () -> Unit
 ) {
+    var showMenu by remember { mutableStateOf(false) }
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -260,29 +280,35 @@ fun SourceItem(
                 )
             }
 
-            // 非多选模式下显示操作按钮
+            // [修改] 非多选模式下，显示三点菜单
             if (!isSelectionMode) {
-                Row {
-                    // [新增] 分享按钮
-                    IconButton(onClick = onShare) {
-                        Icon(
-                            Icons.Default.Share,
-                            contentDescription = "分享",
-                            tint = MaterialTheme.colorScheme.secondary
-                        )
+                Box {
+                    IconButton(onClick = { showMenu = true }) {
+                        Icon(Icons.Default.MoreVert, contentDescription = "更多")
                     }
-                    IconButton(onClick = onEdit) {
-                        Icon(
-                            Icons.Default.Edit,
-                            contentDescription = "编辑",
-                            tint = MaterialTheme.colorScheme.primary
+                    DropdownMenu(
+                        expanded = showMenu,
+                        onDismissRequest = { showMenu = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("更新") },
+                            onClick = { showMenu = false; onUpdate() },
+                            leadingIcon = { Icon(Icons.Default.Refresh, null) }
                         )
-                    }
-                    IconButton(onClick = onDelete) {
-                        Icon(
-                            Icons.Default.Delete,
-                            contentDescription = "删除",
-                            tint = MaterialTheme.colorScheme.error
+                        DropdownMenuItem(
+                            text = { Text("分享") },
+                            onClick = { showMenu = false; onShare() },
+                            leadingIcon = { Icon(Icons.Default.Share, null) }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("编辑") },
+                            onClick = { showMenu = false; onEdit() },
+                            leadingIcon = { Icon(Icons.Default.Edit, null) }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("删除", color = MaterialTheme.colorScheme.error) },
+                            onClick = { showMenu = false; onDelete() },
+                            leadingIcon = { Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error) }
                         )
                     }
                 }

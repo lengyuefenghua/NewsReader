@@ -51,7 +51,6 @@ sealed class Screen(val route: String, val title: String, val icon: ImageVector)
 fun NewsReaderApp() {
     val navController = rememberNavController()
     val timelineViewModel: TimelineViewModel = viewModel()
-    val context = LocalContext.current
     val items = listOf(Screen.Timeline, Screen.Sources, Screen.Profile)
 
     Scaffold(
@@ -68,6 +67,10 @@ fun NewsReaderApp() {
                             label = { Text(screen.title) },
                             selected = currentRoute == screen.route,
                             onClick = {
+                                // 点击底部导航时，如果点击的是时间线，重置过滤条件
+                                if (screen.route == Screen.Timeline.route) {
+                                    timelineViewModel.resetSourceFilter()
+                                }
                                 navController.navigate(screen.route) {
                                     popUpTo(navController.graph.findStartDestination().id) {
                                         saveState = true
@@ -90,6 +93,7 @@ fun NewsReaderApp() {
             composable(Screen.Timeline.route) {
                 TimelineScreen(
                     viewModel = timelineViewModel,
+                    title = "时间线",
                     onArticleClick = { url ->
                         val encodedUrl = URLEncoder.encode(url, StandardCharsets.UTF_8.toString())
                         navController.navigate("article/$encodedUrl")
@@ -100,12 +104,45 @@ fun NewsReaderApp() {
             composable(Screen.Sources.route) {
                 SourceManagerScreen(
                     onOpenAdvanced = { navController.navigate("source_edit") },
-                    onEditSource = { sourceId -> navController.navigate("source_edit?id=$sourceId") }
+                    onEditSource = { sourceId -> navController.navigate("source_edit?id=$sourceId") },
+                    onSourceClick = { sourceId ->
+                        // [新增] 跳转到特定源的时间线
+                        navController.navigate("source_feed/$sourceId")
+                    }
                 )
             }
 
             composable(Screen.Profile.route) { ProfileScreen() }
+// [新增] 特定源的时间线页面
+            composable(
+                route = "source_feed/{sourceId}",
+                arguments = listOf(navArgument("sourceId") { type = NavType.IntType })
+            ) { backStackEntry ->
+                val sourceId = backStackEntry.arguments?.getInt("sourceId") ?: -1
 
+                // 激活 VM 中的源过滤器
+                LaunchedEffect(sourceId) {
+                    if (sourceId != -1) {
+                        timelineViewModel.showSource(sourceId)
+                    }
+                }
+                DisposableEffect(Unit) {
+                    onDispose {
+                        timelineViewModel.resetSourceFilter()
+                    }
+                }
+                // 监听当前显示的源名称
+                val currentSourceTitle by timelineViewModel.currentSourceName.collectAsState()
+
+                TimelineScreen(
+                    viewModel = timelineViewModel,
+                    title = currentSourceTitle ?: "加载中...",
+                    onArticleClick = { url ->
+                        val encodedUrl = URLEncoder.encode(url, StandardCharsets.UTF_8.toString())
+                        navController.navigate("article/$encodedUrl")
+                    }
+                )
+            }
             composable(
                 route = "article/{url}",
                 arguments = listOf(navArgument("url") { type = NavType.StringType })
