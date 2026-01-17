@@ -1,7 +1,10 @@
 package com.lengyuefenghua.newsreader.data
+import androidx.room.Entity
+import androidx.room.PrimaryKey
 
+@Entity(tableName = "articles")
 data class Article(
-    val id: String,          // 唯一标识
+    @PrimaryKey val id: String,// 唯一标识
     val title: String,       // 标题
     val summary: String,     // 摘要
     val content: String?,    // 正文

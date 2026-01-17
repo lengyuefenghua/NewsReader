@@ -52,16 +52,20 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.lengyuefenghua.newsreader.data.Source
 import com.lengyuefenghua.newsreader.viewmodel.SourceViewModel
+import java.net.SocketImpl
+
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SourceManagerScreen(
     viewModel: SourceViewModel = viewModel(),
-    onOpenAdvanced: () -> Unit,
-    onEditSource: (Int) -> Unit
+    onOpenAdvanced: () -> Unit = {},
+    onEditSource: (Int) -> Unit = {}
 ) {
     val sources by viewModel.sources.collectAsState()
     val context = LocalContext.current
@@ -286,13 +290,12 @@ fun SourceItem(
         }
     }
 }
-@Preview
 @Composable
 fun SimpleAddDialog(
-    onDismiss: () -> Unit = {},
-    onConfirm: (String, String) -> Unit = { _, _ -> },
-    onSwitchToAdvanced: () -> Unit = {},
-    onImportFromClipboard: () -> Unit = {} // 添加空函数作为默认值
+    onDismiss: () -> Unit,
+    onConfirm: (String, String) -> Unit,
+    onSwitchToAdvanced: () -> Unit,
+    onImportFromClipboard: () -> Unit // 添加空函数作为默认值
 ) {
     var name by remember { mutableStateOf("") }
     var url by remember { mutableStateOf("") }

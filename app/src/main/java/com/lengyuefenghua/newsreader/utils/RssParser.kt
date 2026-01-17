@@ -97,7 +97,7 @@ class RssParser {
         }
 
         // 简单处理时间
-        val displayDate = try { pubDate?.take(16) ?: "" } catch (e: Exception) { "" }
+        val displayDate = formatDate(pubDate)
 
         return Article(
             id = link,
@@ -109,7 +109,40 @@ class RssParser {
             url = link
         )
     }
+    // 日期格式化辅助函数
+    private fun formatDate(rawDate: String?): String {
+        if (rawDate.isNullOrBlank()) return ""
+        return try {
+            // RSS 标准日期格式 (RFC 1123)，例如: Wed, 14 Jan 2026 15:30:00 GMT
+            // 使用 Locale.US 解析英文月份/星期
+            val inputFormat = SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz", Locale.US)
+            val date = inputFormat.parse(rawDate)
 
+            if (date != null) {
+                // 目标格式: 2026/01/17 11:56
+                val outputFormat = SimpleDateFormat("yyyy/MM/dd HH:mm", Locale.getDefault())
+                outputFormat.format(date)
+            } else {
+                rawDate // 解析失败返回原值
+            }
+        } catch (e: Exception) {
+            // 如果格式不匹配（比如是 ISO 8601），尝试 ISO 格式
+            try {
+                val isoFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)
+                val date = isoFormat.parse(rawDate)
+                if (date != null) {
+                    val outputFormat = SimpleDateFormat("yyyy/MM/dd HH:mm", Locale.getDefault())
+                    outputFormat.format(date)
+                } else {
+                    rawDate
+                }
+            } catch (e2: Exception) {
+                // 依然解析失败，尝试去掉星期几再解析，或者直接返回原始值
+                // 之前代码是取前16位，作为最后的兜底
+                try { rawDate.take(16) } catch (e3: Exception) { rawDate }
+            }
+        }
+    }
     private fun readText(parser: XmlPullParser): String {
         var result = ""
         if (parser.next() == XmlPullParser.TEXT) {

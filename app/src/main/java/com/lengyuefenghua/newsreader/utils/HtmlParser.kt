@@ -52,7 +52,7 @@ class HtmlParser {
                             summary = summaryText, // 列表显示的文字
                             content = null,        // [关键修改] 设为 null，ArticleScreen 就会直接加载 URL
                             sourceName = source.name,
-                            pubDate = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date()),
+                            pubDate = SimpleDateFormat("yyyy/MM/dd HH:mm", Locale.getDefault()).format(Date()),
                             url = linkUrl
                         )
                     )
