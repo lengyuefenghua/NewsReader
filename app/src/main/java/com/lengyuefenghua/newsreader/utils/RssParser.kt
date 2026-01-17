@@ -211,7 +211,7 @@ class RssParser {
             } else {
                 rawDate
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             try {
                 val isoFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)
                 val date = isoFormat.parse(rawDate)
@@ -221,10 +221,10 @@ class RssParser {
                 } else {
                     rawDate
                 }
-            } catch (e2: Exception) {
+            } catch (_: Exception) {
                 try {
                     rawDate.take(16)
-                } catch (e3: Exception) {
+                } catch (_: Exception) {
                     rawDate
                 }
             }

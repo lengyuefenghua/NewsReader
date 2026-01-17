@@ -36,11 +36,6 @@ class NewsRepository(private val database: AppDatabase) {
         return articleDao.getArticlesBySourceFlow(sourceName)
     }
 
-    // [新增] 获取收藏文章流
-    fun getFavoriteArticles(): Flow<List<Article>> {
-        return articleDao.getFavoriteArticlesFlow()
-    }
-
     // [新增] 获取单篇文章流，修复类型不匹配问题
     fun getArticleFlow(url: String): Flow<Article?> {
         return articleDao.getArticleFlow(url)

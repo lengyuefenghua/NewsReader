@@ -14,13 +14,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.Divider
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -71,7 +71,7 @@ fun ProfileScreen(
                 )
             }
         }
-        Divider()
+        HorizontalDivider()
 
         SettingItem(Icons.Default.Favorite, "我的收藏", "查看已收藏的文章", onOpenFavorites)
         // [新增] 阅读统计入口
@@ -103,7 +103,7 @@ fun SettingItem(icon: ImageVector, title: String, subtitle: String, onClick: () 
             )
         }
         Icon(
-            Icons.Default.KeyboardArrowRight,
+            Icons.AutoMirrored.Filled.KeyboardArrowRight,
             null,
             tint = MaterialTheme.colorScheme.outlineVariant
         )

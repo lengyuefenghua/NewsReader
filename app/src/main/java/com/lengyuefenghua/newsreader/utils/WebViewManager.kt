@@ -103,7 +103,7 @@ object WebViewManager {
                                 try {
                                     val rawHtml = JSONTokener(value).nextValue().toString()
                                     safeResume(rawHtml)
-                                } catch (e: Exception) {
+                                } catch (_: Exception) {
                                     safeResume(value ?: "")
                                 }
                             }

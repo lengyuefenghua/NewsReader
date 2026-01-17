@@ -13,7 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.PlayArrow
@@ -67,7 +67,7 @@ fun EditSourceScreen(
                 title = { Text(if (sourceId == -1) "配置订阅源" else "编辑订阅源") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, null)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, null)
                     }
                 },
                 actions = {
@@ -93,7 +93,7 @@ fun EditSourceScreen(
                                     viewModel.ruleImage = source.ruleImage
                                     Toast.makeText(context, "配置已填入", Toast.LENGTH_SHORT).show()
                                 }
-                            } catch (e: Exception) {
+                            } catch (_: Exception) {
                                 Toast.makeText(context, "格式错误，无法解析", Toast.LENGTH_SHORT)
                                     .show()
                             }

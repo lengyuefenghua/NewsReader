@@ -92,8 +92,6 @@ interface ArticleDao {
     @Query("UPDATE articles SET isFavorite = 0 WHERE id IN (:ids)")
     suspend fun removeFavorites(ids: List<String>)
 
-    @Query("DELETE FROM articles")
-    suspend fun clearAll()
 
     // [新增] 缓存清理：保留最新的 limit 条，且不删除收藏的文章
     @Query(

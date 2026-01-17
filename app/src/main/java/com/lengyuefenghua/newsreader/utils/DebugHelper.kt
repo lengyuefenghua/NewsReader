@@ -88,7 +88,7 @@ object DebugHelper {
             val items = rssParser.parse(xml.byteInputStream(), source.name)
             sb.append("✅ RSS 解析成功，找到 ${items.size} 篇文章。\n")
             sb.append("首篇文章预览\n")
-            var elements = items.first()
+            val elements = items.first()
             sb.append("文章标题：${elements.title}\n")
             sb.append("文章日期：${elements.pubDate}\n")
             sb.append("文章描述：${elements.summary}\n")
@@ -113,11 +113,13 @@ object DebugHelper {
                 val first = elements.first()
                 val tRule = source.ruleTitle
                 val title =
-                    if (tRule.isNotBlank()) first.select(tRule).text() else first.text().take(50)
+                    if (tRule.isNotBlank()) first.select(tRule)?.text() ?: "null" else first.text()
+                        .take(50)
                 sb.append("标题示例: $title\n")
                 val lRule = source.ruleLink
-                val link = if (lRule.isNotBlank()) first.select(lRule)
-                    .attr("abs:href") else first.select("a").attr("abs:href")
+                val link =
+                    if (lRule.isNotBlank()) first.select(lRule)?.attr("abs:href") ?: "null"
+                    else first.select("a")?.attr("abs:href") ?: "null"
                 sb.append("链接示例: $link\n")
             } else {
                 sb.append("❌ 未找到列表项。\n")

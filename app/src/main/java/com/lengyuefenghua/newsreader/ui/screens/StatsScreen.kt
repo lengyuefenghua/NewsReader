@@ -15,7 +15,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoGraph
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -62,7 +62,7 @@ fun StatsScreen(onBack: () -> Unit, viewModel: StatsViewModel = viewModel()) {
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
-                            Icons.Default.ArrowBack,
+                            Icons.AutoMirrored.Filled.ArrowBack,
                             "返回"
                         )
                     }
@@ -237,36 +237,6 @@ fun StatRow(
 }
 
 @Composable
-fun SmallStatCard(
-    modifier: Modifier,
-    title: String,
-    stat: ReadStat?,
-    viewModel: StatsViewModel
-) {
-    Card(
-        modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                title,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSecondaryContainer
-            )
-            Text(
-                "${stat?.count ?: 0} 篇",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                viewModel.formatDuration(stat?.totalDuration ?: 0L),
-                style = MaterialTheme.typography.bodySmall
-            )
-        }
-    }
-}
-
-@Composable
 fun SourceRankRow(item: SourceDetailStat, viewModel: StatsViewModel) {
     // 计算阅读百分比
     val progress =
@@ -297,7 +267,7 @@ fun SourceRankRow(item: SourceDetailStat, viewModel: StatsViewModel) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             // 进度条显示已读比例
             LinearProgressIndicator(
-                progress = progress,
+                progress = { progress },
                 modifier = Modifier.weight(1f).height(6.dp),
                 strokeCap = androidx.compose.ui.graphics.StrokeCap.Round,
                 color = MaterialTheme.colorScheme.primary,
