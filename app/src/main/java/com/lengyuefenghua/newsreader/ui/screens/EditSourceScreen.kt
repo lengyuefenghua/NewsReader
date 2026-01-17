@@ -1,6 +1,7 @@
 package com.lengyuefenghua.newsreader.ui.screens
 
 import android.net.Uri
+import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -8,37 +9,37 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.gson.Gson
 import com.lengyuefenghua.newsreader.NewsReaderApplication
+import com.lengyuefenghua.newsreader.data.Source
 import com.lengyuefenghua.newsreader.viewmodel.EditSourceViewModel
 import com.lengyuefenghua.newsreader.viewmodel.EditSourceViewModelFactory
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditSourceScreen(
-    sourceId: Int = -1, // 传入 ID
+    sourceId: Int = -1,
     onBack: () -> Unit,
     onSave: () -> Unit,
     onDebug: (String) -> Unit
 ) {
-    // 1. 获取数据库实例
     val context = LocalContext.current
     val database = (context.applicationContext as NewsReaderApplication).database
-
-    // 2. 获取 ViewModel (使用 Factory 注入 Dao)
     val viewModel: EditSourceViewModel = viewModel(
         factory = EditSourceViewModelFactory(database.sourceDao())
     )
+    val clipboardManager = LocalClipboardManager.current
 
-    // 3. 初始化数据 (仅第一次有效)
     LaunchedEffect(sourceId) {
         viewModel.loadSourceIfNeed(sourceId)
     }
@@ -49,14 +50,43 @@ fun EditSourceScreen(
                 title = { Text(if (sourceId == -1) "配置订阅源" else "编辑订阅源") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(
-                            Icons.Default.ArrowBack,
-                            null
-                        )
+                        Icon(Icons.Default.ArrowBack, null)
                     }
                 },
                 actions = {
-                    // 调试按钮：从 VM 获取最新数据
+                    // [新增] 剪贴板导入/粘贴按钮
+                    IconButton(onClick = {
+                        val text = clipboardManager.getText()?.text
+                        if (!text.isNullOrBlank()) {
+                            try {
+                                val source = Gson().fromJson(text, Source::class.java)
+                                if (source != null) {
+                                    // 填充数据到 ViewModel
+                                    viewModel.name = source.name
+                                    viewModel.url = source.url
+                                    viewModel.selectedTab = if (source.isCustom) 1 else 0
+                                    viewModel.useAutoExtract = source.useAutoExtract
+                                    viewModel.ruleContent = source.ruleContent
+                                    viewModel.requestMethod = source.requestMethod
+                                    viewModel.enablePcUserAgent = source.enablePcUserAgent
+                                    viewModel.ruleList = source.ruleList
+                                    viewModel.ruleTitle = source.ruleTitle
+                                    viewModel.ruleLink = source.ruleLink
+                                    viewModel.ruleSummary = source.ruleSummary
+                                    viewModel.ruleImage = source.ruleImage
+                                    Toast.makeText(context, "配置已填入", Toast.LENGTH_SHORT).show()
+                                }
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "格式错误，无法解析", Toast.LENGTH_SHORT).show()
+                            }
+                        } else {
+                            Toast.makeText(context, "剪贴板为空", Toast.LENGTH_SHORT).show()
+                        }
+                    }) {
+                        Icon(Icons.Default.ContentPaste, contentDescription = "从剪贴板粘贴")
+                    }
+
+                    // 调试按钮
                     IconButton(onClick = {
                         val source = viewModel.buildSource()
                         val json = Uri.encode(Gson().toJson(source))
@@ -84,9 +114,7 @@ fun EditSourceScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp)
         ) {
-            // --- 现在所有的 value 都直接绑定到 viewModel.xxx ---
-            // 这样无论怎么跳转，只要 ViewModel 不死，数据就在
-
+            // (原有 UI 代码，保持不变)
             OutlinedTextField(
                 value = viewModel.name,
                 onValueChange = { viewModel.name = it },
@@ -103,7 +131,6 @@ fun EditSourceScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // 模式切换
             TabRow(selectedTabIndex = viewModel.selectedTab) {
                 Tab(
                     selected = viewModel.selectedTab == 0,
@@ -116,7 +143,7 @@ fun EditSourceScreen(
             }
 
             if (viewModel.selectedTab == 0) {
-                // RSS 模式
+                // RSS 模式 UI
                 Text(
                     "高级选项：正文抓取",
                     style = MaterialTheme.typography.titleMedium,
@@ -138,7 +165,7 @@ fun EditSourceScreen(
                     )
                 }
             } else {
-
+                // 自定义模式 UI
                 Text(
                     "列表抓取规则",
                     style = MaterialTheme.typography.titleMedium,
@@ -178,7 +205,6 @@ fun EditSourceScreen(
                 )
                 Text("高级选项", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
 
-                // 1. WebView 复选框
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.clickable {
@@ -194,7 +220,6 @@ fun EditSourceScreen(
                     Text("使用 WebView 加载地址")
                 }
 
-                // 2. 模拟 PC 复选框
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.clickable {
