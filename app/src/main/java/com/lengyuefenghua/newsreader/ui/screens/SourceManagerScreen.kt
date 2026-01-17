@@ -90,7 +90,16 @@ fun SourceManagerScreen(
                 Text("暂无订阅源，点击右下角添加")
             }
         } else {
-            LazyColumn(contentPadding = innerPadding, modifier = Modifier.fillMaxSize()) {
+            LazyColumn(
+                // [修改点] 将 left 改为 start，将 right 改为 end
+                contentPadding = PaddingValues(
+                    top = innerPadding.calculateTopPadding(),
+                    start = 16.dp,
+                    end = 16.dp,
+                    bottom = innerPadding.calculateBottomPadding() + 88.dp // 留出 FAB 空间
+                ),
+                modifier = Modifier.fillMaxSize()
+            ) {
                 items(sourceItems) { item ->
                     val isSelected = selectedIds.contains(item.source.id)
                     SourceItem(
@@ -195,7 +204,11 @@ fun SourceItem(
                 Checkbox(checked = isSelected, onCheckedChange = { onClick() })
                 Spacer(modifier = Modifier.width(8.dp))
             }
-            Column(modifier = Modifier.weight(1f)) {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(end = 12.dp) // [新增] 强制留出右侧空间，防止文字与图标挤在一起
+            ){
                 Text(text = source.name, style = MaterialTheme.typography.titleMedium)
                 Text(text = source.url, style = MaterialTheme.typography.bodySmall, maxLines = 1)
 
