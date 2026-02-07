@@ -1,0 +1,127 @@
+<resources>
+    <string name="app_name">NewsReader</string>
+
+    <!-- 无障碍描述 - 导航类 -->
+    <string name="desc_back">返回</string>
+    <string name="desc_close">关闭</string>
+    <string name="desc_navigation_menu">导航菜单</string>
+
+    <!-- 无障碍描述 - 操作类 -->
+    <string name="desc_refresh">刷新</string>
+    <string name="desc_save">保存</string>
+    <string name="desc_delete">删除</string>
+    <string name="desc_edit">编辑</string>
+    <string name="desc_share">分享</string>
+    <string name="desc_add">添加</string>
+    <string name="desc_debug">调试</string>
+    <string name="desc_copy">复制</string>
+    <string name="desc_search">搜索</string>
+    <string name="desc_export">导出</string>
+    <string name="desc_import">导入</string>
+    <string name="desc_sync">同步</string>
+    <string name="desc_select_all">全选</string>
+    <string name="desc_cancel">取消</string>
+
+    <!-- 无障碍描述 - 状态类 -->
+    <string name="desc_mark_read">标记已读</string>
+    <string name="desc_mark_unread">标记未读</string>
+    <string name="desc_favorite">收藏</string>
+    <string name="desc_unfavorite">取消收藏</string>
+
+    <!-- 无障碍描述 - 功能类 -->
+    <string name="desc_toggle_mode">切换显示模式</string>
+    <string name="desc_translate">翻译</string>
+    <string name="desc_clear_cache">清理缓存</string>
+    <string name="desc_open_in_browser">在浏览器中打开</string>
+
+    <!-- 无障碍描述 - 过滤器 -->
+    <string name="desc_filter_all">全部文章</string>
+    <string name="desc_filter_unread">未读文章</string>
+    <string name="desc_filter_read">已读文章</string>
+
+    <!-- 无障碍描述 - 内容项（动态格式） -->
+    <string name="desc_article">文章：%s</string>
+    <string name="desc_source">订阅源：%s</string>
+    <string name="desc_setting_item">%1$s，%2$s</string>
+
+    <!-- 无障碍描述 - 底部导航 -->
+    <string name="desc_tab_timeline">时间线</string>
+    <string name="desc_tab_sources">订阅源</string>
+    <string name="desc_tab_profile">个人中心</string>
+
+    <!-- 无障碍描述 - 开关 -->
+    <string name="desc_switch_on">已开启</string>
+    <string name="desc_switch_off">已关闭</string>
+
+    <!-- 无障碍描述 - 进度和加载 -->
+    <string name="desc_loading">正在加载</string>
+    <string name="desc_syncing">正在同步</string>
+
+    <!-- EditSourceScreen - 编辑订阅源 -->
+    <string name="desc_input_name">订阅源名称</string>
+    <string name="desc_input_url">订阅源地址</string>
+    <string name="desc_tab_standard">标准RSS混合模式</string>
+    <string name="desc_tab_custom">完全自定义模式</string>
+    <string name="desc_radio_no_extract">不提取使用RSS原始内容</string>
+    <string name="desc_radio_gne">GNE自动提取算法</string>
+    <string name="desc_radio_cx">CxExtractor提取算法</string>
+    <string name="desc_radio_readability">Readability提取算法</string>
+    <string name="desc_radio_css">CSS选择器</string>
+    <string name="desc_input_rule_list">列表容器CSS选择器</string>
+    <string name="desc_input_rule_title">标题CSS选择器</string>
+    <string name="desc_input_rule_link">链接CSS选择器</string>
+    <string name="desc_input_rule_image">图片CSS选择器</string>
+    <string name="desc_input_rule_summary">摘要CSS选择器</string>
+    <string name="desc_input_rule_content">正文CSS选择器</string>
+    <string name="desc_checkbox_webview">使用WebView加载</string>
+    <string name="desc_checkbox_pc_ua">模拟PC浏览器</string>
+
+    <!-- TimelineScreen - 时间线 -->
+    <string name="desc_filter_dropdown">文章过滤器</string>
+    <string name="desc_article_card">文章卡片</string>
+    <string name="desc_refresh_timeline">刷新时间线</string>
+
+    <!-- SourceManagerScreen - 订阅源管理 -->
+    <string name="desc_source_card">订阅源卡片</string>
+    <string name="desc_button_edit_source">编辑订阅源</string>
+    <string name="desc_button_delete_source">删除订阅源</string>
+    <string name="desc_menu_more">更多选项</string>
+
+    <!-- ArticleScreen - 文章详情 -->
+    <string name="desc_webview">文章内容</string>
+    <string name="desc_button_favorite">收藏文章</string>
+    <string name="desc_button_unfavorite">取消收藏</string>
+    <string name="desc_button_open_browser">浏览器打开</string>
+
+    <!-- FavoritesScreen - 收藏 -->
+    <string name="desc_button_unfavorite_article">取消收藏</string>
+
+    <!-- SettingsScreen - 设置 -->
+    <string name="desc_setting_auto_refresh">自动刷新开关</string>
+    <string name="desc_setting_clear_cache">清理缓存</string>
+
+    <!-- StatsScreen - 统计 -->
+    <string name="desc_stat_card">统计卡片</string>
+
+    <!-- ProfileScreen - 个人中心 -->
+    <string name="desc_button_about">关于</string>
+    <string name="desc_button_debug_console">调试控制台</string>
+    <string name="desc_button_favorites">我的收藏</string>
+    <string name="desc_button_stats">阅读统计</string>
+    <string name="desc_button_settings">设置</string>
+    <string name="desc_button_open_source">致敬开源</string>
+
+    <!-- DebugConsoleScreen - 调试控制台 -->
+    <string name="desc_button_clear_log">清空日志</string>
+    <string name="desc_button_copy_log">复制日志</string>
+    <string name="desc_button_view_log">查看日志</string>
+    <string name="desc_button_view_source">查看源码</string>
+
+    <!-- FavoritesScreen - 收藏 -->
+    <string name="desc_checkbox_select_article">选择文章</string>
+
+    <!-- SourceManagerScreen - 订阅源管理 -->
+    <string name="desc_checkbox_select_source">选择订阅源</string>
+    <string name="desc_mark_all_read">全部已读</string>
+    <string name="desc_mark_all_unread">全部未读</string>
+</resources>

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="GBrowserService"><![CDATA[{
+  "defaultHomePage": "http://127.0.0.1:4096",
+  "hideIdLabel": false,
+  "showBookMarksInToolbar": false,
+  "isHistoryEnabled": false,
+  "isSuggestionSearchHighlighted": false,
+  "isHostHighlight": false,
+  "isFavIconEnabled": false,
+  "isTabIconVisible": false,
+  "navigateInNewTab": false,
+  "isProtocolHidden": false,
+  "isDragAndDropEnabled": false
+}]]></component>
+</project>
