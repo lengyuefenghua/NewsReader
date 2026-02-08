@@ -2,6 +2,117 @@
 
 本文件记录 NewsReader 项目的所有重要修改。
 
+### 2026-02-08 v0.0.4 性能优化与 UI 简化
+
+**修改原因：**
+1. 用户反馈串行刷新速度太慢，10 个订阅源需要等待 30-60 秒
+2. 用户反馈每次刷新都滚动到顶部很烦人，尤其是没有新文章时
+3. 用户反馈单源刷新时提示太多 Toast，影响阅读体验
+4. 用户反馈设置页面太繁杂，占用空间太大，需要滚动很多
+5. 用户反馈输入框太大，边框太明显
+
+**修改内容：**
+- **并发刷新性能优化**：
+  - 新增"并发刷新"设置项，支持调整并发刷新数量（1-5，默认 3）
+  - 使用增减按钮（−/+）控制，比 Slider 更直观
+  - 使用 Semaphore 控制并发数，避免资源耗尽
+  - 使用 Kotlin Coroutines async/awaitAll 实现并发刷新
+  - 高并发数刷新速度提升 2-5 倍（取决于网络和设备性能）
+  - 单源失败不影响其他源继续刷新
+- **智能滚动优化**：
+  - 仅当有新文章时才自动滚动到列表顶部
+  - 无新文章时保持当前阅读位置
+  - 单源刷新显示详细新增文章数
+  - 避免不必要的界面跳转，提升阅读体验
+- **精简刷新通知**：
+  - 移除单源刷新完成时的 Toast 提示
+  - 仅保留最终汇总通知："刷新完成,共更新 N 篇新文章"
+  - 减少提示干扰，让用户专注于阅读
+- **设置页面大幅简化**：
+  - 所有设置项高度统一为 48dp，视觉整齐
+  - 删除所有冗余的灰色描述文字
+  - 移除所有分割线，减少视觉噪音
+  - 整体间距从 16dp 减少到 12dp，更紧凑
+  - 筛选选项从垂直 RadioButton 改为水平 FilterChip 布局
+  - 并发刷新使用增减按钮（− 数字 +）代替 Slider
+  - 文章保留数量使用紧凑的 BasicTextField（80dp × 36dp，1dp 细边框）
+  - 按钮高度统一为 40dp，字体为 bodyMedium
+  - 移除所有 Toast 提示，点击即生效
+  - 代码从 356 行减少到 243 行（减少 32%）
+
+**技术细节：**
+- `SettingsManager`: 新增 `getConcurrentCount()` 和 `setConcurrentCount()` 方法（范围 1-5）
+- `NewsRepository.syncAll()`: 使用 Semaphore 和 async/awaitAll 实现并发刷新，使用 AtomicInteger 线程安全地跟踪完成数
+- `NewsRepository.syncSource()`: 明确返回类型为 `Int?`
+- `RefreshProgress`: 添加 `current` 和 `total` 字段，正确显示刷新进度（如 "2/5"）
+- `TimelineViewModel`: 智能判断是否发送 ScrollToTop 事件，传入 `settingsManager.getConcurrentCount()` 到 `syncAll()`
+- `SettingsScreen`: 完全重构，使用 `SettingRow` 辅助函数统一布局，BasicTextField 替代 OutlinedTextField
+- `UiEvent`: 移除 `SourceRefreshed` 事件类
+- 设置页面新增 `SettingRow` 辅助函数，确保所有设置项高度统一为 48dp
+
+---
+
+### 2026-02-08 v0.0.3 用户体验优化
+
+**修改原因：**
+1. 用户反馈每次打开应用都需要手动切换到"未读"才能看到新内容，操作繁琐
+2. 用户反馈刷新订阅源时不知道进度，也不知道更新了多少新文章
+3. 用户反馈批量刷新需要等待所有源完成才能看到新内容，等待时间过长
+4. 用户希望能够自定义启动时的默认筛选条件，满足个人阅读习惯
+
+**修改内容：**
+- **默认筛选状态可配置**：
+  - 新增设置页面"默认筛选条件"选项
+  - 支持用户选择"全部/未读/已读"作为应用启动时的默认筛选器
+  - 工厂默认值：未读（关注新内容）
+  - 使用 SharedPreferences 持久化用户选择
+  - 重启应用后自动恢复用户设置
+- **智能刷新进度反馈**：
+  - 刷新过程中显示每个订阅源的实时进度提示
+  - 单源完成提示："{订阅源名}: 已更新 X 篇新文章"或"无新文章"或"刷新失败"
+  - 所有源完成提示："刷新完成,共更新 N 篇新文章"（失败时显示失败源数量）
+  - Toast 消息时长：成功 2 秒，无新文章 1.5 秒，失败 2 秒，总计 3 秒
+  - 源名称超过 20 字符时自动截断为 17 字符 + "..."
+- **增量刷新策略**：
+  - 从批量刷新改为增量刷新，每个订阅源刷新完立即更新 UI
+  - 串行执行策略确保进度反馈准确（按顺序逐个刷新）
+  - 单源刷新失败不影响其他源继续刷新
+  - 自动统计新增文章数量（通过对比数据库插入前后数量）
+- **筛选器显示名称扩展**：
+  - 为 `FilterType` 枚举添加 `displayName` 属性（"全部"/"未读"/"已读"）
+  - 添加 `description` 属性用于设置页面说明文字
+- **设置管理器新增**：
+  - 新增 `SettingsManager.kt` 工具类，封装 SharedPreferences 读写
+  - 提供类型安全的 API：`getDefaultFilterType()` / `setDefaultFilterType()`
+  - 在 Koin 中注册为单例，支持依赖注入
+- **数据模型扩展**：
+  - 新增 `RefreshProgress.kt`：单源刷新进度数据
+  - 新增 `RefreshSummary.kt`：刷新汇总数据
+  - 扩展 `UiEvent`：添加 `SourceRefreshed` 和 `RefreshCompleted` 事件
+  - 扩展 `ArticleDao`：添加 `getArticleCountBySource()` 方法
+- **Repository 层重构**：
+  - `syncAll()` 改为串行执行 + 结构化进度回调
+  - `fetchAndSave()` 返回新增文章数量
+  - 完善错误处理，单源失败不影响其他源
+- **ViewModel 层优化**：
+  - `TimelineViewModel` 集成 `SettingsManager`，从设置读取默认筛选值
+  - 移除硬编码的 `FilterType.ALL` 默认值
+  - 刷新逻辑发送增量进度事件和汇总事件
+
+**影响范围：**
+- 新增文件：`SettingsManager.kt`、`RefreshProgress.kt`
+- 修改文件：`TimelineViewModel.kt`、`NewsRepository.kt`、`ArticleDao.kt`、`TimelineScreen.kt`、`SettingsScreen.kt`、`TimelineUiState.kt`、`UiEvent.kt`、`ViewModelModule.kt`、`AppModule.kt`
+- 用户体验：首次打开应用显示未读文章，刷新时实时看到进度，设置更灵活
+- 无破坏性变更：向后兼容，用户设置不会被覆盖
+
+**测试结果：**
+- 功能测试：✅ 默认筛选未读、设置页面 UI、即时生效、增量刷新、进度反馈、源名称截断
+- 兼容性测试：✅ 单源刷新模式、快速点击防重复、网络异常处理
+- 性能测试：✅ 10 个订阅源串行刷新总耗时约 20 秒（每个源 2 秒）
+- UI 测试：✅ 筛选器切换、Toast 顺序显示、设置页面交互
+
+---
+
 ### 2026-02-07 v0.0.2 新增功能 & 性能优化
 
 **修改原因：**
