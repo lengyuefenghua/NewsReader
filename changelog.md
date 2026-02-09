@@ -2,6 +2,39 @@
 
 本文件记录 NewsReader 项目的所有重要修改。
 
+### 2026-02-08 v0.0.5 Bug 修复
+
+**修改原因：**
+1. 用户反馈数据备份恢复功能失败，无法正确导入之前的设置
+2. 用户反馈本地订阅源导入失败时没有明确错误提示，难以排查问题
+
+**修改内容：**
+- **修复数据备份恢复**：
+  - `BackupSettings` 添加 `defaultFilterType` 字段（默认筛选条件）
+  - `BackupSettings` 添加 `concurrentCount` 字段（并发刷新数量）
+  - 备份版本号从 "1.0" 更新到 "2.0"
+  - 恢复时兼容旧版本备份（缺失字段使用默认值）
+  - `SettingsViewModel` 添加 `settingsManager` 依赖注入
+  - `NewsReaderApplication` 添加 `settingsManager` 初始化
+- **修复订阅源导入错误提示**：
+  - `ImportResult` 添加 `error` 字段用于传递错误详情
+  - `ImportResult` 添加 `hasError` 属性快速判断是否有错误
+  - JSON 解析失败时返回详细错误信息和格式示例
+  - 导入失败时显示具体错误原因而非通用提示
+  - 支持显示 JSON 格式错误的详细信息
+  - 空数据检查，返回明确的"导入内容为空"提示
+
+**技术细节：**
+- `BackupData.kt`: 扩展 `BackupSettings` 数据类，新增 2 个字段
+- `SettingsViewModel.kt`: `createBackup()` 保存新设置，`restoreBackup()` 兼容旧版本
+- `SourceViewModel.kt`: `ImportResult` 添加错误支持，改进错误处理
+- `SourceManagerScreen.kt`: UI 层检查并显示详细错误信息
+
+**相关提交：**
+- `860abc1`: fix: 修复数据备份恢复和订阅源导入问题
+
+---
+
 ### 2026-02-08 v0.0.4 性能优化与 UI 简化
 
 **修改原因：**
