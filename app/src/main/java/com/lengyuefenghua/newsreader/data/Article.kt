@@ -3,6 +3,7 @@ package com.lengyuefenghua.newsreader.data
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import java.io.Serializable
 
 @Entity(tableName = "articles")
 data class Article(
@@ -23,4 +24,4 @@ data class Article(
     // [新增] 累计阅读时长 (毫秒)
     @ColumnInfo(defaultValue = "0")
     val readDuration: Long = 0
-)
+) : Serializable

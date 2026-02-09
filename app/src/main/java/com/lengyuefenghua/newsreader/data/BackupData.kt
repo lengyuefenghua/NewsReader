@@ -1,6 +1,8 @@
 package com.lengyuefenghua.newsreader.data
 
 import com.google.gson.annotations.SerializedName
+import com.lengyuefenghua.newsreader.ui.common.FilterType
+import java.io.Serializable
 
 /**
  * 完整数据备份模型
@@ -24,7 +26,7 @@ data class BackupData(
 
     @SerializedName("settings")
     val settings: BackupSettings      // 用户设置
-)
+) : Serializable
 
 /**
  * 用户设置备份数据
@@ -41,4 +43,4 @@ data class BackupSettings(
 
     @SerializedName("concurrentCount")
     val concurrentCount: Int = 3      // 并发刷新数量（v0.0.4 新增）
-)
+) : Serializable

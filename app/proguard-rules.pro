@@ -46,3 +46,13 @@
 # 保留刷新进度数据类
 -keep class com.lengyuefenghua.newsreader.data.RefreshProgress { *; }
 -keep class com.lengyuefenghua.newsreader.data.RefreshSummary { *; }
+
+# ===== v0.0.5 数据备份类保护 =====
+# 保留所有数据备份相关类
+-keep class com.lengyuefenghua.newsreader.data.BackupData { *; }
+-keep class com.lengyuefenghua.newsreader.data.BackupSettings { *; }
+-keep class com.lengyuefenghua.newsreader.data.Article { *; }
+-keep class com.lengyuefenghua.newsreader.data.Source { *; }
+
+# 保留所有 ViewModel 中的数据类
+-keep class com.lengyuefenghua.newsreader.viewmodel.ImportResult { *; }
