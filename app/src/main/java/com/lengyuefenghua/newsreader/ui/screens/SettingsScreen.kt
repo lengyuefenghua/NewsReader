@@ -4,23 +4,28 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
@@ -29,7 +34,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -38,65 +45,76 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.lengyuefenghua.newsreader.R
+import com.lengyuefenghua.newsreader.ui.common.FilterType
+import com.lengyuefenghua.newsreader.ui.common.displayName
+import com.lengyuefenghua.newsreader.util.SettingsManager
 import com.lengyuefenghua.newsreader.viewmodel.SettingsViewModel
 import kotlinx.coroutines.launch
+import org.koin.compose.koinInject
+
+@Composable
+private fun SettingRow(
+    label: String,
+    content: @Composable () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().height(48.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyLarge)
+        content()
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
-    viewModel: SettingsViewModel = viewModel()
+    viewModel: SettingsViewModel = viewModel(),
+    settingsManager: SettingsManager = koinInject()
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val autoUpdate by viewModel.autoUpdate.collectAsState()
     val cacheLimit by viewModel.cacheLimit.collectAsState()
 
-    // 临时状态，用于输入框编辑
-    var tempLimit by remember(cacheLimit) { mutableStateOf(cacheLimit.toString()) }
-
-    // 数据备份相关状态
-    var showRestoreConfirmDialog by remember { mutableStateOf(false) }
+    var concurrentCount by remember { mutableIntStateOf(settingsManager.getConcurrentCount()) }
+    var defaultFilter by remember { mutableStateOf(settingsManager.getDefaultFilterType()) }
+    var tempLimit by remember { mutableStateOf(cacheLimit.toString()) }
+    var showRestoreDialog by remember { mutableStateOf(false) }
     var pendingRestoreUri by remember { mutableStateOf<android.net.Uri?>(null) }
 
-    // Pre-load content description strings
-    val descSettingAutoRefresh = context.getString(R.string.desc_setting_auto_refresh)
-    val descSettingClearCache = context.getString(R.string.desc_setting_clear_cache)
-
-    // 备份文件选择器 launcher
-    val backupFileLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument("application/json")
+    val backupLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json")
     ) { uri ->
         if (uri != null) {
             coroutineScope.launch {
-                val message = viewModel.saveBackupToFile(uri, context)
-                Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                val msg = viewModel.saveBackupToFile(uri, context)
+                Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
             }
         }
     }
 
-    // 恢复文件选择器 launcher
-    val restoreFileLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument()
+    val restoreLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
     ) { uri ->
         if (uri != null) {
             coroutineScope.launch {
                 try {
-                    val backupData = viewModel.loadBackupFromFile(uri, context)
-                    if (backupData != null) {
+                    val data = viewModel.loadBackupFromFile(uri, context)
+                    if (data != null) {
                         pendingRestoreUri = uri
-                        showRestoreConfirmDialog = true
+                        showRestoreDialog = true
                     } else {
-                        Toast.makeText(context, "备份文件格式错误或已损坏", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "备份文件格式错误", Toast.LENGTH_SHORT).show()
                     }
                 } catch (e: Exception) {
-                    Toast.makeText(context, "读取备份文件失败: ${e.message}", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "读取失败: ${e.message}", Toast.LENGTH_SHORT).show()
                 }
             }
         }
@@ -113,140 +131,171 @@ fun SettingsScreen(
                 }
             )
         }
-    ) { innerPadding ->
+    ) { padding ->
         Column(
             modifier = Modifier
-                .padding(innerPadding)
+                .padding(padding)
                 .fillMaxSize()
-                .padding(16.dp)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // 自动更新开关
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("自动更新", style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        "打开应用时自动检查更新",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.outline
-                    )
-                }
+            // 自动更新
+            SettingRow(label = "自动更新") {
                 Switch(
                     checked = autoUpdate,
-                    onCheckedChange = { viewModel.setAutoUpdate(it) },
-                    modifier = Modifier.semantics { contentDescription = descSettingAutoRefresh }
+                    onCheckedChange = { viewModel.setAutoUpdate(it) }
                 )
             }
-            HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
 
-            // 缓存数量设置
-            Text("缓存管理", style = MaterialTheme.typography.titleMedium)
-            Spacer(modifier = Modifier.height(8.dp))
-            OutlinedTextField(
-                value = tempLimit,
-                onValueChange = {
-                    tempLimit = it
-                    // 仅当输入是纯数字时尝试保存
-                    val num = it.toIntOrNull()
-                    if (num != null && num > 0) {
-                        viewModel.setCacheLimit(num)
+            // 并发刷新
+            SettingRow(label = "并发刷新") {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    IconButton(
+                        onClick = {
+                            if (concurrentCount > 1) {
+                                concurrentCount--
+                                settingsManager.setConcurrentCount(concurrentCount)
+                            }
+                        },
+                        enabled = concurrentCount > 1
+                    ) {
+                        Text("−", style = MaterialTheme.typography.titleMedium)
                     }
-                },
-                label = { Text("文章保留数量 (条)") },
-                supportingText = { Text("超出此数量的旧文章将被清理（已收藏除外）") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.fillMaxWidth()
-            )
+                    Text(
+                        "$concurrentCount",
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.width(30.dp)
+                    )
+                    IconButton(
+                        onClick = {
+                            if (concurrentCount < 5) {
+                                concurrentCount++
+                                settingsManager.setConcurrentCount(concurrentCount)
+                            }
+                        },
+                        enabled = concurrentCount < 5
+                    ) {
+                        Text("+", style = MaterialTheme.typography.titleMedium)
+                    }
+                }
+            }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            // 默认筛选
+            SettingRow(label = "默认筛选") {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    FilterType.values().forEach { type ->
+                        FilterChip(
+                            selected = defaultFilter == type,
+                            onClick = {
+                                defaultFilter = type
+                                settingsManager.setDefaultFilterType(type)
+                            },
+                            label = { Text(type.displayName, style = MaterialTheme.typography.bodySmall) }
+                        )
+                    }
+                }
+            }
 
-            Button(
-                onClick = { viewModel.clearCacheNow() },
+            // 文章保留
+            SettingRow(label = "文章保留") {
+                Box(
+                    modifier = Modifier
+                        .width(80.dp)
+                        .height(36.dp)
+                        .border(
+                            width = 1.dp,
+                            color = MaterialTheme.colorScheme.outline,
+                            shape = RoundedCornerShape(4.dp)
+                        )
+                        .padding(4.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    BasicTextField(
+                        value = tempLimit,
+                        onValueChange = {
+                            tempLimit = it
+                            it.toIntOrNull()?.let { num ->
+                                if (num > 0) viewModel.setCacheLimit(num)
+                            }
+                        },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        textStyle = MaterialTheme.typography.bodyMedium.copy(
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        ),
+                        singleLine = true
+                    )
+                }
+            }
+
+            // 清理缓存
+            SettingRow(label = "清理缓存") {
+                Button(
+                    onClick = { viewModel.clearCacheNow() },
+                    modifier = Modifier.height(40.dp)
+                ) {
+                    Text("清理", style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+
+            // 数据备份
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .semantics { contentDescription = descSettingClearCache }
-            ) {
-                Text("立即清理过期缓存")
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-            HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
-
-            // 数据备份区域
-            Text("数据备份", style = MaterialTheme.typography.titleMedium)
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                "备份所有订阅源、文章和设置，可用于跨设备迁移或升级后恢复数据",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.outline
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    .height(48.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 Button(
                     onClick = {
-                        val fileName = "NewsReader_Full_Backup_${System.currentTimeMillis()}.json"
-                        backupFileLauncher.launch(fileName)
+                        backupLauncher.launch("NewsReader_${System.currentTimeMillis()}.json")
                     },
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f).height(40.dp)
                 ) {
-                    Text("📤 备份数据")
+                    Text("备份", style = MaterialTheme.typography.bodyMedium)
                 }
                 Button(
                     onClick = {
-                        restoreFileLauncher.launch(arrayOf("application/json"))
+                        restoreLauncher.launch(arrayOf("application/json"))
                     },
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f).height(40.dp)
                 ) {
-                    Text("📥 恢复数据")
+                    Text("恢复", style = MaterialTheme.typography.bodyMedium)
                 }
             }
         }
+    }
 
-        // 恢复确认对话框
-        if (showRestoreConfirmDialog) {
-            AlertDialog(
-                onDismissRequest = { showRestoreConfirmDialog = false },
-                title = { Text("确认恢复数据") },
-                text = {
-                    Text("恢复数据将覆盖现有所有数据（订阅源、文章、设置等），此操作不可撤销。是否继续？")
-                },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            coroutineScope.launch {
-                                val uri = pendingRestoreUri ?: return@launch
-                                val backupData = viewModel.loadBackupFromFile(uri, context)
-                                if (backupData != null) {
-                                    val message = viewModel.restoreBackup(backupData)
-                                    Toast.makeText(context, message, Toast.LENGTH_LONG).show()
-                                }
-                                showRestoreConfirmDialog = false
-                                pendingRestoreUri = null
+    // 恢复确认对话框
+    if (showRestoreDialog) {
+        AlertDialog(
+            onDismissRequest = { showRestoreDialog = false },
+            title = { Text("确认恢复") },
+            text = { Text("恢复将覆盖所有数据，是否继续？") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        coroutineScope.launch {
+                            val uri = pendingRestoreUri ?: return@launch
+                            viewModel.loadBackupFromFile(uri, context)?.let {
+                                Toast.makeText(context, viewModel.restoreBackup(it), Toast.LENGTH_LONG).show()
                             }
-                        }
-                    ) {
-                        Text("确认恢复")
-                    }
-                },
-                dismissButton = {
-                    TextButton(
-                        onClick = {
-                            showRestoreConfirmDialog = false
+                            showRestoreDialog = false
                             pendingRestoreUri = null
                         }
-                    ) {
-                        Text("取消")
                     }
-                }
-            )
-        }
+                ) { Text("确认") }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showRestoreDialog = false
+                        pendingRestoreUri = null
+                    }
+                ) { Text("取消") }
+            }
+        )
     }
 }

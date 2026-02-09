@@ -139,11 +139,16 @@ fun SourceManagerScreen(
                         } else {
                             // 没有重复，直接导入
                             val result = viewModel.importFromJson(json, ImportStrategy.SKIP)
-                            if (result.imported > 0) {
-                                Toast.makeText(context, "成功导入 ${result.imported} 个订阅源", Toast.LENGTH_SHORT).show()
-                                showSimpleDialog = false
+                            val message = if (result.hasError) {
+                                result.error ?: "导入失败"
+                            } else if (result.imported > 0) {
+                                "成功导入 ${result.imported} 个订阅源"
                             } else {
-                                Toast.makeText(context, "文件内容无效或解析失败", Toast.LENGTH_SHORT).show()
+                                "文件内容无效或解析失败"
+                            }
+                            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                            if (result.imported > 0) {
+                                showSimpleDialog = false
                             }
                         }
                     } else {
@@ -347,6 +352,7 @@ fun SourceManagerScreen(
 
                             // 根据结果显示不同的提示
                             val message = when {
+                                result.hasError -> result.error ?: "导入失败"
                                 result.total == 0 -> "文件内容无效或解析失败"
                                 strategy == ImportStrategy.SKIP && result.imported > 0 && result.skipped > 0 ->
                                     "成功导入 ${result.imported} 个，跳过 ${result.skipped} 个重复"
@@ -428,11 +434,16 @@ fun SourceManagerScreen(
                             } else {
                                 // 没有重复，直接导入
                                 val result = viewModel.importFromJson(clipboardContent, ImportStrategy.SKIP)
-                                if (result.imported > 0) {
-                                    Toast.makeText(context, "成功导入 ${result.imported} 个订阅源", Toast.LENGTH_SHORT).show()
-                                    showSimpleDialog = false
+                                val message = if (result.hasError) {
+                                    result.error ?: "导入失败"
+                                } else if (result.imported > 0) {
+                                    "成功导入 ${result.imported} 个订阅源"
                                 } else {
-                                    Toast.makeText(context, "文件内容无效或解析失败", Toast.LENGTH_SHORT).show()
+                                    "文件内容无效或解析失败"
+                                }
+                                Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                                if (result.imported > 0) {
+                                    showSimpleDialog = false
                                 }
                             }
                         }

@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.Semaphore
 
 class NewsRepository(private val database: AppDatabase) {
 
@@ -47,37 +47,74 @@ class NewsRepository(private val database: AppDatabase) {
         return articleDao.getArticleFlow(url)
     }
 
-    // [修改] syncAll 现在接受进度回调，返回 Result
-    // onProgress: (finishedCount, totalCount, currentSourceName)
-    suspend fun syncAll(onProgress: (Int, Int, String) -> Unit): Result<Unit> = withContext(Dispatchers.IO) {
+    // [重构] syncAll 改为并发刷新,返回 RefreshSummary
+    // concurrentLimit: 并发数（1-5，默认 3）
+    // onProgress: 每个源刷新完成后回调
+    suspend fun syncAll(
+        concurrentLimit: Int = 3,
+        onProgress: (RefreshProgress) -> Unit
+    ): Result<RefreshSummary> = withContext(Dispatchers.IO) {
         try {
             val sources = sourceDao.getAllSources().first()
             if (sources.isEmpty()) {
-                return@withContext Result.Success(Unit)
+                return@withContext Result.Success(RefreshSummary(0, 0, 0))
             }
 
+            // 创建 Semaphore 限制并发数
+            val semaphore = Semaphore(concurrentLimit)
             val total = sources.size
-            val counter = AtomicInteger(0)
+            var totalNewArticles = 0
+            var failedSources = 0
+            val completedCount = java.util.concurrent.atomic.AtomicInteger(0)
 
-            // 初始通知
-            onProgress(0, total, "准备开始...")
-
+            // 并发刷新每个订阅源
             val deferredResults = sources.map { source ->
                 async {
-                    // 开始前通知：正在更新 xxx
-                    // 注意：由于并行执行，这里可能会快速刷新，UI 层展示其中一个即可
-                    onProgress(counter.get(), total, source.name)
+                    semaphore.acquire()
+                    try {
+                        val newCount = fetchAndSave(source)
 
-                    fetchAndSave(source)
+                        // 发送进度回调并累加新增文章数
+                        val current = completedCount.incrementAndGet()
+                        onProgress(RefreshProgress(
+                            sourceName = source.name,
+                            success = true,
+                            newArticleCount = newCount,
+                            current = current,
+                            total = total
+                        ))
 
-                    // 完成后增加计数
-                    val current = counter.incrementAndGet()
-                    onProgress(current, total, source.name)
+                        newCount
+                    } catch (e: Exception) {
+                        Log.e("NewsRepository", "刷新失败: ${source.name}", e)
+
+                        // 单源失败不影响其他源
+                        failedSources++
+                        val current = completedCount.incrementAndGet()
+                        onProgress(RefreshProgress(
+                            sourceName = source.name,
+                            success = false,
+                            newArticleCount = 0,
+                            current = current,
+                            total = total
+                        ))
+
+                        0
+                    } finally {
+                        semaphore.release()
+                    }
                 }
             }
-            deferredResults.awaitAll()
 
-            Result.Success(Unit)
+            // 等待所有并发任务完成并累加结果
+            val results = deferredResults.awaitAll()
+            totalNewArticles = results.sum()
+
+            Result.Success(RefreshSummary(
+                totalNewArticles = totalNewArticles,
+                totalSources = total,
+                failedSources = failedSources
+            ))
         } catch (e: Exception) {
             when (e) {
                 is java.net.UnknownHostException -> {
@@ -93,10 +130,12 @@ class NewsRepository(private val database: AppDatabase) {
         }
     }
 
-    suspend fun syncSource(sourceId: Int) = withContext(Dispatchers.IO) {
+    suspend fun syncSource(sourceId: Int): Int? = withContext(Dispatchers.IO) {
         val source = sourceDao.getSourceById(sourceId)
         if (source != null) {
             fetchAndSave(source)
+        } else {
+            null
         }
     }
 
@@ -155,7 +194,7 @@ class NewsRepository(private val database: AppDatabase) {
         }
     }
 
-    private suspend fun fetchAndSave(source: Source) {
+    private suspend fun fetchAndSave(source: Source): Int {
         val startTime = System.currentTimeMillis()
         try {
             val currentUserAgent = if (source.enablePcUserAgent) UA_PC else UA_ANDROID
@@ -201,7 +240,18 @@ class NewsRepository(private val database: AppDatabase) {
                 }
 
                 if (items.isNotEmpty()) {
+                    // 获取插入前的文章数量
+                    val beforeCount = articleDao.getArticleCountBySource(source.name)
+
+                    // 插入文章
                     articleDao.insertArticles(items)
+
+                    // 获取插入后的文章数量
+                    val afterCount = articleDao.getArticleCountBySource(source.name)
+
+                    val newCount = afterCount - beforeCount
+                    LogUtils.log("新增文章：$newCount 篇")
+                    return newCount
                 }
             } else {
                  LogUtils.log("加载失败：HTTP状态：${response.code}")
@@ -209,8 +259,10 @@ class NewsRepository(private val database: AppDatabase) {
         } catch (e: Exception) {
             LogUtils.log("同步失败 [${source.name}]: ${e.message}")
             Log.e("NewsReader", "同步失败", e)
+            throw e  // 抛出异常,让上层处理
         }
         val endTime = System.currentTimeMillis()
         LogUtils.log("解析完成：${endTime - startTime}毫秒")
+        return 0
     }
 }

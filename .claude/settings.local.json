@@ -52,7 +52,10 @@
       "Bash(python3:*)",
       "Bash(magick:*)",
       "Bash(iconv:*)",
-      "Bash(openspec:*)"
+      "Bash(openspec:*)",
+      "Bash(find:*)",
+      "Bash(./gradlew:*)",
+      "Bash(git commit:*)"
     ]
   },
   "enableAllProjectMcpServers": true,

@@ -5,8 +5,8 @@ import org.koin.androidx.viewmodel.dsl.viewModel
 import org.koin.dsl.module
 
 val viewModelModule = module {
-    // TimelineViewModel - 已重构，使用 NewsRepository
-    viewModel { TimelineViewModel(get()) }
+    // TimelineViewModel - 已重构，使用 NewsRepository 和 SettingsManager
+    viewModel { TimelineViewModel(get(), get()) }
 
     // EditSourceViewModel - 需要 SourceDao
     viewModel { (sourceId: Int) -> EditSourceViewModel(get()) }

@@ -66,7 +66,7 @@ fun TimelineScreen(
         viewModel.event.collect { event ->
             when (event) {
                 is UiEvent.Toast -> {
-                    Toast.makeText(context, event.message, Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, event.message, event.duration).show()
                 }
                 is UiEvent.ScrollToTop -> {
                     listState.animateScrollToItem(0)
@@ -77,6 +77,20 @@ fun TimelineScreen(
                 }
                 is UiEvent.Navigate -> {
                     // 导航事件由父组件处理
+                }
+                is UiEvent.RefreshCompleted -> {
+                    // 所有源刷新完成
+                    val message = when {
+                        event.failedSources == event.totalNew && event.failedSources > 0 ->
+                            "刷新失败,请检查网络连接"
+                        event.failedSources > 0 ->
+                            "刷新完成,更新 ${event.totalNew} 篇新文章,${event.failedSources} 个源失败"
+                        event.totalNew > 0 ->
+                            "刷新完成,共更新 ${event.totalNew} 篇新文章"
+                        else ->
+                            "刷新完成,无新文章"
+                    }
+                    Toast.makeText(context, message, 3000).show()
                 }
             }
         }

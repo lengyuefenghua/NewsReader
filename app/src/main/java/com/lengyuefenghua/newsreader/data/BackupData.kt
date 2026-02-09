@@ -34,5 +34,11 @@ data class BackupSettings(
     val autoUpdate: Boolean,          // 自动更新开关
 
     @SerializedName("cacheLimit")
-    val cacheLimit: Int               // 缓存限制数量
+    val cacheLimit: Int,              // 缓存限制数量
+
+    @SerializedName("defaultFilterType")
+    val defaultFilterType: String = "UNREAD",  // 默认筛选类型（v0.0.3 新增）
+
+    @SerializedName("concurrentCount")
+    val concurrentCount: Int = 3      // 并发刷新数量（v0.0.4 新增）
 )

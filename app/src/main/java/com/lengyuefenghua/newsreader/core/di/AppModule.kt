@@ -4,6 +4,7 @@ import android.app.Application
 import com.lengyuefenghua.newsreader.data.AppDatabase
 import com.lengyuefenghua.newsreader.data.NewsRepository
 import com.lengyuefenghua.newsreader.data.UserPreferencesRepository
+import com.lengyuefenghua.newsreader.util.SettingsManager
 import okhttp3.OkHttpClient
 import org.koin.android.ext.koin.androidApplication
 import org.koin.dsl.module
@@ -23,6 +24,9 @@ val appModule = module {
     // Repositories
     single { NewsRepository(get()) }
     single { UserPreferencesRepository(get()) }
+
+    // Settings
+    single { SettingsManager(get()) }
 
     // OkHttpClient
     single {

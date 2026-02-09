@@ -10,6 +10,7 @@ import com.google.gson.Gson
 import com.lengyuefenghua.newsreader.NewsReaderApplication
 import com.lengyuefenghua.newsreader.data.*
 import com.lengyuefenghua.newsreader.data.UserPreferencesRepository
+import com.lengyuefenghua.newsreader.util.SettingsManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.SharingStarted
@@ -22,6 +23,7 @@ import java.util.Locale
 
 class SettingsViewModel(application: Application) : AndroidViewModel(application) {
     private val prefsRepo = (application as NewsReaderApplication).userPreferencesRepository
+    private val settingsManager = (application as NewsReaderApplication).settingsManager
     private val articleDao = (application as NewsReaderApplication).database.articleDao()
     private val sourceDao = (application as NewsReaderApplication).database.sourceDao()
     private val gson = Gson()
@@ -63,19 +65,23 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         val articles = articleDao.getAllArticles()
         val autoUpdate = prefsRepo.autoUpdateFlow.first()
         val cacheLimit = prefsRepo.cacheLimitFlow.first()
+        val defaultFilterType = settingsManager.getDefaultFilterType().name
+        val concurrentCount = settingsManager.getConcurrentCount()
 
         val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())
         val backupDate = dateFormat.format(Date())
 
         BackupData(
-            version = "1.0",
+            version = "2.0", // 更新版本号以支持新字段
             backupDate = backupDate,
             databaseVersion = 10, // 当前数据库版本
             sources = sources,
             articles = articles,
             settings = BackupSettings(
                 autoUpdate = autoUpdate,
-                cacheLimit = cacheLimit
+                cacheLimit = cacheLimit,
+                defaultFilterType = defaultFilterType,
+                concurrentCount = concurrentCount
             )
         )
     }
@@ -139,6 +145,28 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             // 4. 恢复用户设置
             prefsRepo.setAutoUpdate(backupData.settings.autoUpdate)
             prefsRepo.setCacheLimit(backupData.settings.cacheLimit)
+
+            // 5. 恢复 v0.0.3 新增的设置（兼容旧版本备份）
+            try {
+                val filterType = when (backupData.settings.defaultFilterType) {
+                    "ALL" -> com.lengyuefenghua.newsreader.ui.common.FilterType.ALL
+                    "READ" -> com.lengyuefenghua.newsreader.ui.common.FilterType.READ
+                    else -> com.lengyuefenghua.newsreader.ui.common.FilterType.UNREAD
+                }
+                settingsManager.setDefaultFilterType(filterType)
+            } catch (e: Exception) {
+                // 忽略错误，使用默认值
+            }
+
+            // 6. 恢复 v0.0.4 新增的设置（兼容旧版本备份）
+            try {
+                val count = backupData.settings.concurrentCount
+                if (count in 1..5) {
+                    settingsManager.setConcurrentCount(count)
+                }
+            } catch (e: Exception) {
+                // 忽略错误，使用默认值
+            }
 
             val sourceCount = backupData.sources.size
             val articleCount = backupData.articles.size

@@ -38,3 +38,11 @@
 
 # 保留所有实现了 Serializable 的数据类
 -keep class com.lengyuefenghua.newsreader.data.** { *; }
+
+# ===== v0.0.3 新增类保护 =====
+# 保留 SettingsManager 和相关设置类
+-keep class com.lengyuefenghua.newsreader.util.SettingsManager { *; }
+
+# 保留刷新进度数据类
+-keep class com.lengyuefenghua.newsreader.data.RefreshProgress { *; }
+-keep class com.lengyuefenghua.newsreader.data.RefreshSummary { *; }

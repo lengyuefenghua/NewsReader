@@ -8,6 +8,7 @@ import com.lengyuefenghua.newsreader.data.NewsRepository
 import com.lengyuefenghua.newsreader.ui.common.FilterType
 import com.lengyuefenghua.newsreader.ui.common.SyncState
 import com.lengyuefenghua.newsreader.ui.common.UiEvent
+import com.lengyuefenghua.newsreader.util.SettingsManager
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -24,10 +25,11 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 class TimelineViewModel(
-    private val repository: NewsRepository
+    private val repository: NewsRepository,
+    private val settingsManager: SettingsManager
 ) : ViewModel() {
 
-    private val _filterState = MutableStateFlow(FilterType.ALL)
+    private val _filterState = MutableStateFlow(settingsManager.getDefaultFilterType())
     val filterState = _filterState.asStateFlow()
 
     // [新增] 源过滤器 (null 表示显示所有)
@@ -88,7 +90,7 @@ class TimelineViewModel(
         refresh()
     }
 
-    // [重构] 处理 Result<Unit> 的刷新方法
+    // [重构] 处理 Result<RefreshSummary> 的刷新方法
     fun refresh() {
         viewModelScope.launch {
             if (_syncState.value.isSyncing) return@launch
@@ -105,36 +107,64 @@ class TimelineViewModel(
                     currentSource = targetSourceName
                 )
 
-                // 执行单源更新
-                repository.syncSource(targetSourceId)
+                // 执行单源更新并获取新增文章数
+                val newCount = repository.syncSource(targetSourceId) ?: 0
 
                 _syncState.value = SyncState(isSyncing = false)
-                _event.send(UiEvent.Toast("更新完成"))
-                _event.send(UiEvent.ScrollToTop)
+
+                // 显示更新结果
+                val message = if (newCount > 0) {
+                    "更新完成，新增 $newCount 篇文章"
+                } else {
+                    "更新完成，无新文章"
+                }
+                _event.send(UiEvent.Toast(message))
+
+                // 智能滚动：仅当有新文章时才滚动到顶部
+                if (newCount > 0) {
+                    _event.send(UiEvent.ScrollToTop)
+                }
 
             } else {
                 // === 全局刷新模式 ===
                 _syncState.value =
                     SyncState(isSyncing = true, current = 0, total = 0, currentSource = "准备中...")
 
-                val result = repository.syncAll { current, total, name ->
+                val result = repository.syncAll(
+                    concurrentLimit = settingsManager.getConcurrentCount()
+                ) { progress ->
+                    // 更新同步状态
                     _syncState.update {
-                        it.copy(current = current, total = total, currentSource = name)
+                        it.copy(
+                            current = progress.current,
+                            total = progress.total,
+                            currentSource = progress.sourceName
+                        )
                     }
                 }
 
                 when (result) {
                     is Result.Success -> {
+                        val summary = result.data
                         _syncState.value = SyncState(isSyncing = false)
-                        _event.send(UiEvent.Toast("全部更新完成"))
-                        _event.send(UiEvent.ScrollToTop)
+
+                        // 发送刷新完成事件
+                        _event.send(UiEvent.RefreshCompleted(
+                            totalNew = summary.totalNewArticles,
+                            failedSources = summary.failedSources
+                        ))
+
+                        // 智能滚动：仅当有新文章时才滚动到顶部
+                        if (summary.totalNewArticles > 0) {
+                            _event.send(UiEvent.ScrollToTop)
+                        }
                     }
                     is Result.Error -> {
                         _syncState.value = SyncState(isSyncing = false)
                         _event.send(UiEvent.ShowError(result.error))
                     }
                     is Result.Loading -> {
-                        // 不需要处理，Loading 状态已在上面设置
+                        // 不需要处理,Loading 状态已在上面设置
                     }
                 }
             }

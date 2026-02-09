@@ -26,9 +26,11 @@ import kotlinx.coroutines.withContext
 data class ImportResult(
     val imported: Int = 0,      // 新导入的数量
     val skipped: Int = 0,       // 跳过的重复数量
-    val updated: Int = 0        // 覆盖更新的数量
+    val updated: Int = 0,       // 覆盖更新的数量
+    val error: String? = null   // 错误信息
 ) {
     val total: Int get() = imported + skipped + updated
+    val hasError: Boolean get() = error != null
 }
 
 // [新增] 导入策略枚举
@@ -167,7 +169,12 @@ class SourceViewModel(application: Application) : AndroidViewModel(application) 
                 val validSources = parseSources(cleanedJson)
                 if (validSources.isEmpty()) {
                     Log.w("SourceViewModel", "解析失败：没有有效的订阅源")
-                    return@withContext ImportResult()
+                    return@withContext ImportResult(
+                        error = "JSON 格式错误或未包含有效的订阅源数据。\n\n" +
+                                "请确保 JSON 格式正确，包含必需字段：name, url\n\n" +
+                                "示例格式：\n" +
+                                "[{\"name\":\"订阅源名称\",\"url\":\"https://example.com/rss\"}]"
+                    )
                 }
 
                 Log.d("SourceViewModel", "解析到 ${validSources.size} 个订阅源，准备写入数据库")
@@ -235,12 +242,12 @@ class SourceViewModel(application: Application) : AndroidViewModel(application) 
                 } catch (e: Exception) {
                     Log.e("SourceViewModel", "✗ 导入失败: ${e.message}", e)
                     e.printStackTrace()
-                    ImportResult()
+                    ImportResult(error = "数据库操作失败：${e.message}")
                 }
             } catch (e: Exception) {
                 Log.e("SourceViewModel", "JSON 解析失败: ${e.message}", e)
                 e.printStackTrace()
-                ImportResult()
+                ImportResult(error = "JSON 解析失败：${e.message}\n\n请检查 JSON 格式是否正确")
             }
         }
     }

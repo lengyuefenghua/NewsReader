@@ -44,6 +44,10 @@ interface ArticleDao {
     @Query("SELECT * FROM articles WHERE sourceName = :sourceName ORDER BY pubDate DESC")
     fun getArticlesBySourceFlow(sourceName: String): Flow<List<Article>>
 
+    // [新增] 获取指定订阅源的文章数量
+    @Query("SELECT COUNT(*) FROM articles WHERE sourceName = :sourceName")
+    suspend fun getArticleCountBySource(sourceName: String): Int
+
     @Query("SELECT * FROM articles WHERE isFavorite = 1 ORDER BY pubDate DESC")
     fun getFavoriteArticlesFlow(): Flow<List<Article>>
 
