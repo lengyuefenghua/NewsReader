@@ -13,10 +13,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
@@ -26,8 +26,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -43,9 +44,13 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.lengyuefenghua.newsreader.R
@@ -55,6 +60,70 @@ import com.lengyuefenghua.newsreader.util.SettingsManager
 import com.lengyuefenghua.newsreader.viewmodel.SettingsViewModel
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
+import kotlin.math.abs
+import kotlin.math.roundToInt
+
+private val DISCRETE_SLIDER_VALUE_WIDTH = 40.dp
+
+@Composable
+private fun DiscreteDotSlider(
+    value: Float,
+    anchorCount: Int,
+    onValueChange: (Float) -> Unit,
+    modifier: Modifier = Modifier,
+    shape: Shape = CircleShape
+) {
+    val selectedIndex = value.roundToInt().coerceIn(0, anchorCount - 1)
+    val activeColor = MaterialTheme.colorScheme.primary
+    val inactiveColor = MaterialTheme.colorScheme.outlineVariant
+
+    BoxWithConstraints(
+        modifier = modifier.height(28.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            repeat(anchorCount) { index ->
+                if (index > 0) {
+                    Spacer(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(2.dp)
+                            .background(
+                                color = if (index <= selectedIndex) activeColor else inactiveColor,
+                                shape = shape
+                            )
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .width(if (index == selectedIndex) 16.dp else 12.dp)
+                        .height(if (index == selectedIndex) 16.dp else 12.dp)
+                        .clip(shape)
+                        .background(if (index == selectedIndex) activeColor else inactiveColor)
+                )
+            }
+        }
+
+        Slider(
+            value = value,
+            onValueChange = onValueChange,
+            valueRange = 0f..(anchorCount - 1).toFloat(),
+            steps = anchorCount - 2,
+            modifier = Modifier.fillMaxWidth(),
+            colors = SliderDefaults.colors(
+                thumbColor = Color.Transparent,
+                activeTrackColor = Color.Transparent,
+                inactiveTrackColor = Color.Transparent,
+                activeTickColor = Color.Transparent,
+                inactiveTickColor = Color.Transparent
+            )
+        )
+    }
+}
 
 @Composable
 private fun SettingRow(
@@ -79,15 +148,20 @@ fun SettingsScreen(
     settingsManager: SettingsManager = koinInject()
 ) {
     val context = LocalContext.current
+    val focusManager = LocalFocusManager.current
     val coroutineScope = rememberCoroutineScope()
     val autoUpdate by viewModel.autoUpdate.collectAsState()
     val cacheLimit by viewModel.cacheLimit.collectAsState()
 
-    var concurrentCount by remember { mutableIntStateOf(settingsManager.getConcurrentCount()) }
+    var concurrentCount by remember {
+        mutableIntStateOf(snapConcurrentCountToAnchor(settingsManager.getConcurrentCount()))
+    }
     var defaultFilter by remember { mutableStateOf(settingsManager.getDefaultFilterType()) }
-    var tempLimit by remember { mutableStateOf(cacheLimit.toString()) }
     var showRestoreDialog by remember { mutableStateOf(false) }
     var pendingRestoreUri by remember { mutableStateOf<android.net.Uri?>(null) }
+    val snappedCacheLimit = snapCacheLimitToAnchor(cacheLimit)
+    val cacheLimitSliderIndex = cacheLimitAnchorIndex(cacheLimit).toFloat()
+    val concurrentSliderIndex = concurrentCountAnchorIndex(concurrentCount).toFloat()
 
     val backupLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json")
@@ -132,137 +206,141 @@ fun SettingsScreen(
             )
         }
     ) { padding ->
-        Column(
+        Box(
             modifier = Modifier
                 .padding(padding)
                 .fillMaxSize()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            // 自动更新
-            SettingRow(label = "自动更新") {
-                Switch(
-                    checked = autoUpdate,
-                    onCheckedChange = { viewModel.setAutoUpdate(it) }
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = { focusManager.clearFocus() }
                 )
-            }
-
-            // 并发刷新
-            SettingRow(label = "并发刷新") {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    IconButton(
-                        onClick = {
-                            if (concurrentCount > 1) {
-                                concurrentCount--
-                                settingsManager.setConcurrentCount(concurrentCount)
-                            }
-                        },
-                        enabled = concurrentCount > 1
-                    ) {
-                        Text("−", style = MaterialTheme.typography.titleMedium)
-                    }
-                    Text(
-                        "$concurrentCount",
-                        style = MaterialTheme.typography.bodyLarge,
-                        modifier = Modifier.width(30.dp)
-                    )
-                    IconButton(
-                        onClick = {
-                            if (concurrentCount < 5) {
-                                concurrentCount++
-                                settingsManager.setConcurrentCount(concurrentCount)
-                            }
-                        },
-                        enabled = concurrentCount < 5
-                    ) {
-                        Text("+", style = MaterialTheme.typography.titleMedium)
-                    }
-                }
-            }
-
-            // 默认筛选
-            SettingRow(label = "默认筛选") {
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    FilterType.values().forEach { type ->
-                        FilterChip(
-                            selected = defaultFilter == type,
-                            onClick = {
-                                defaultFilter = type
-                                settingsManager.setDefaultFilterType(type)
-                            },
-                            label = { Text(type.displayName, style = MaterialTheme.typography.bodySmall) }
-                        )
-                    }
-                }
-            }
-
-            // 文章保留
-            SettingRow(label = "文章保留") {
-                Box(
-                    modifier = Modifier
-                        .width(80.dp)
-                        .height(36.dp)
-                        .border(
-                            width = 1.dp,
-                            color = MaterialTheme.colorScheme.outline,
-                            shape = RoundedCornerShape(4.dp)
-                        )
-                        .padding(4.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    BasicTextField(
-                        value = tempLimit,
-                        onValueChange = {
-                            tempLimit = it
-                            it.toIntOrNull()?.let { num ->
-                                if (num > 0) viewModel.setCacheLimit(num)
-                            }
-                        },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        textStyle = MaterialTheme.typography.bodyMedium.copy(
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                        ),
-                        singleLine = true
-                    )
-                }
-            }
-
-            // 清理缓存
-            SettingRow(label = "清理缓存") {
-                Button(
-                    onClick = { viewModel.clearCacheNow() },
-                    modifier = Modifier.height(40.dp)
-                ) {
-                    Text("清理", style = MaterialTheme.typography.bodyMedium)
-                }
-            }
-
-            // 数据备份
-            Row(
+        ) {
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(48.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .fillMaxSize()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Button(
-                    onClick = {
-                        backupLauncher.launch("NewsReader_${System.currentTimeMillis()}.json")
-                    },
-                    modifier = Modifier.weight(1f).height(40.dp)
-                ) {
-                    Text("备份", style = MaterialTheme.typography.bodyMedium)
+                // 自动更新
+                SettingRow(label = "自动更新") {
+                    Switch(
+                        checked = autoUpdate,
+                        onCheckedChange = {
+                            focusManager.clearFocus()
+                            viewModel.setAutoUpdate(it)
+                        }
+                    )
                 }
-                Button(
-                    onClick = {
-                        restoreLauncher.launch(arrayOf("application/json"))
-                    },
-                    modifier = Modifier.weight(1f).height(40.dp)
+
+                // 并发刷新
+                SettingRow(label = "并发刷新") {
+                    Row(
+                        modifier = Modifier.width(220.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            "$concurrentCount",
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.width(DISCRETE_SLIDER_VALUE_WIDTH)
+                        )
+                        DiscreteDotSlider(
+                            value = concurrentSliderIndex,
+                            anchorCount = CONCURRENT_COUNT_ANCHORS.size,
+                            onValueChange = { sliderValue ->
+                                focusManager.clearFocus()
+                                val newCount = concurrentCountFromSliderIndex(sliderValue)
+                                if (newCount != concurrentCount) {
+                                    concurrentCount = newCount
+                                    settingsManager.setConcurrentCount(newCount)
+                                }
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+
+                // 默认筛选
+                SettingRow(label = "默认筛选") {
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        FilterType.values().forEach { type ->
+                            FilterChip(
+                                selected = defaultFilter == type,
+                                onClick = {
+                                    focusManager.clearFocus()
+                                    defaultFilter = type
+                                    settingsManager.setDefaultFilterType(type)
+                                },
+                                label = { Text(type.displayName, style = MaterialTheme.typography.bodySmall) }
+                            )
+                        }
+                    }
+                }
+
+                // 文章保留
+                SettingRow(label = "文章保留") {
+                    Row(
+                        modifier = Modifier.width(220.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = snappedCacheLimit.toString(),
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.width(DISCRETE_SLIDER_VALUE_WIDTH)
+                        )
+                        DiscreteDotSlider(
+                            value = cacheLimitSliderIndex,
+                            anchorCount = CACHE_LIMIT_ANCHORS.size,
+                            onValueChange = { sliderValue ->
+                                focusManager.clearFocus()
+                                viewModel.setCacheLimit(cacheLimitFromSliderIndex(sliderValue))
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+
+                // 清理缓存
+                SettingRow(label = "清理缓存") {
+                    Button(
+                        onClick = {
+                            focusManager.clearFocus()
+                            viewModel.clearCacheNow()
+                        },
+                        modifier = Modifier.height(40.dp)
+                    ) {
+                        Text("清理", style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+
+                // 数据备份
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(48.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("恢复", style = MaterialTheme.typography.bodyMedium)
+                    Button(
+                        onClick = {
+                            focusManager.clearFocus()
+                            backupLauncher.launch("NewsReader_${System.currentTimeMillis()}.json")
+                        },
+                        modifier = Modifier.weight(1f).height(40.dp)
+                    ) {
+                        Text("备份", style = MaterialTheme.typography.bodyMedium)
+                    }
+                    Button(
+                        onClick = {
+                            focusManager.clearFocus()
+                            restoreLauncher.launch(arrayOf("application/json"))
+                        },
+                        modifier = Modifier.weight(1f).height(40.dp)
+                    ) {
+                        Text("恢复", style = MaterialTheme.typography.bodyMedium)
+                    }
                 }
             }
         }
@@ -299,3 +377,51 @@ fun SettingsScreen(
         )
     }
 }
+
+internal fun syncCacheLimitDraft(currentDraft: String, persistedLimit: Int): String {
+    val persistedText = persistedLimit.toString()
+    return if (currentDraft == persistedText) currentDraft else persistedText
+}
+
+internal val CACHE_LIMIT_ANCHORS = listOf(10, 50, 100, 500, 1000)
+internal val CONCURRENT_COUNT_ANCHORS = listOf(1, 2, 3, 4, 5)
+
+internal fun snapToNearestAnchor(value: Int, anchors: List<Int>): Int {
+    return anchors.minByOrNull { abs(it - value) } ?: anchors.first()
+}
+
+internal fun snapCacheLimitToAnchor(value: Int): Int {
+    return snapToNearestAnchor(value, CACHE_LIMIT_ANCHORS)
+}
+
+internal fun cacheLimitAnchorIndex(value: Int): Int {
+    return CACHE_LIMIT_ANCHORS.indexOf(snapCacheLimitToAnchor(value)).coerceAtLeast(0)
+}
+
+internal fun cacheLimitFromSliderIndex(index: Float): Int {
+    val snappedIndex = index.roundToInt().coerceIn(0, CACHE_LIMIT_ANCHORS.lastIndex)
+    return CACHE_LIMIT_ANCHORS[snappedIndex]
+}
+
+internal fun snapConcurrentCountToAnchor(value: Int): Int {
+    return snapToNearestAnchor(value, CONCURRENT_COUNT_ANCHORS)
+}
+
+internal fun concurrentCountAnchorIndex(value: Int): Int {
+    return CONCURRENT_COUNT_ANCHORS.indexOf(snapConcurrentCountToAnchor(value)).coerceAtLeast(0)
+}
+
+internal fun concurrentCountFromSliderIndex(index: Float): Int {
+    val snappedIndex = index.roundToInt().coerceIn(0, CONCURRENT_COUNT_ANCHORS.lastIndex)
+    return CONCURRENT_COUNT_ANCHORS[snappedIndex]
+}
+
+internal fun shouldClearCacheLimitFocusOnImeDone(): Boolean = false
+
+internal fun shouldUseOutlinedCacheLimitField(): Boolean = false
+
+internal fun discreteSliderValueWidthDp(): Int = 40
+
+internal fun concurrentCountValueWidthDp(): Int = discreteSliderValueWidthDp()
+
+internal fun cacheLimitValueWidthDp(): Int = discreteSliderValueWidthDp()
