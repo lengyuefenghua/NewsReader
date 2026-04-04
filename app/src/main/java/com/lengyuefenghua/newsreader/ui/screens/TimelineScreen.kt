@@ -28,6 +28,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -57,6 +60,7 @@ fun TimelineScreen(
     val currentFilter by viewModel.filterState.collectAsState()
     val listState = rememberLazyListState() // [新增] 滚动状态控制
     val context = LocalContext.current
+    var previousFirstArticleId by remember { mutableStateOf<String?>(null) }
 
     // Pre-load content description strings
     val descRefreshTimeline = context.getString(R.string.desc_refresh_timeline)
@@ -94,6 +98,23 @@ fun TimelineScreen(
                 }
             }
         }
+    }
+
+    LaunchedEffect(syncState.isSyncing, articles.firstOrNull()?.id) {
+        val currentFirstArticleId = articles.firstOrNull()?.id
+        val visibleArticleKey = listState.layoutInfo.visibleItemsInfo.firstOrNull()?.key
+
+        if (shouldRevealNewTopArticle(
+                previousFirstArticleId = previousFirstArticleId,
+                currentFirstArticleId = currentFirstArticleId,
+                visibleArticleKey = visibleArticleKey,
+                firstVisibleItemScrollOffset = listState.firstVisibleItemScrollOffset,
+                isSyncing = syncState.isSyncing
+            )) {
+            listState.scrollToItem(0)
+        }
+
+        previousFirstArticleId = currentFirstArticleId
     }
 
     Scaffold(
@@ -181,6 +202,21 @@ fun TimelineScreen(
             }
         }
     }
+}
+
+internal fun shouldRevealNewTopArticle(
+    previousFirstArticleId: String?,
+    currentFirstArticleId: String?,
+    visibleArticleKey: Any?,
+    firstVisibleItemScrollOffset: Int,
+    isSyncing: Boolean,
+    maxPinnedOffset: Int = 120
+): Boolean {
+    if (!isSyncing) return false
+    if (previousFirstArticleId.isNullOrBlank() || currentFirstArticleId.isNullOrBlank()) return false
+    if (previousFirstArticleId == currentFirstArticleId) return false
+    if (visibleArticleKey != previousFirstArticleId) return false
+    return firstVisibleItemScrollOffset <= maxPinnedOffset
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
