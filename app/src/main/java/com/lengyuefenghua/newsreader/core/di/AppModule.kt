@@ -22,7 +22,7 @@ val appModule = module {
     single { get<AppDatabase>().sourceDao() }
 
     // Repositories
-    single { NewsRepository(get()) }
+    single { NewsRepository(get(), get()) }
     single { UserPreferencesRepository(get()) }
 
     // Settings

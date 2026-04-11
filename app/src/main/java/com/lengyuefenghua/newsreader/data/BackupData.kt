@@ -42,5 +42,8 @@ data class BackupSettings(
     val defaultFilterType: String = "UNREAD",  // 默认筛选类型（v0.0.3 新增）
 
     @SerializedName("concurrentCount")
-    val concurrentCount: Int = 3      // 并发刷新数量（v0.0.4 新增）
+    val concurrentCount: Int = 3,     // 并发刷新数量（v0.0.4 新增）
+
+    @SerializedName("sourceTimeoutSeconds")
+    val sourceTimeoutSeconds: Int = 10
 ) : Serializable

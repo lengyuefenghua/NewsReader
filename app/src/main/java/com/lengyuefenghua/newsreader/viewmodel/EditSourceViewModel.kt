@@ -41,10 +41,18 @@ class EditSourceViewModel(private val sourceDao: SourceDao) : ViewModel() {
 
 
     // [核心修复 1]：真正从数据库加载数据
-    fun loadSourceIfNeed(id: Int) {
+    fun loadSourceIfNeed(id: Int, initialName: String = "", initialUrl: String = "") {
         // 如果是新增(-1) 或者 数据已经加载过了，就直接跳过
-        if (id == -1 || isDataLoaded) {
+        if (isDataLoaded) {
             currentId = id
+            return
+        }
+
+        if (id == -1) {
+            currentId = -1
+            name = initialName
+            url = initialUrl
+            isDataLoaded = true
             return
         }
 

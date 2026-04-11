@@ -67,12 +67,13 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         val cacheLimit = prefsRepo.cacheLimitFlow.first()
         val defaultFilterType = settingsManager.getDefaultFilterType().name
         val concurrentCount = settingsManager.getConcurrentCount()
+        val sourceTimeoutSeconds = settingsManager.getSourceTimeoutSeconds()
 
         val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.getDefault())
         val backupDate = dateFormat.format(Date())
 
         BackupData(
-            version = "2.0", // 更新版本号以支持新字段
+            version = "2.1", // 更新版本号以支持新字段
             backupDate = backupDate,
             databaseVersion = 10, // 当前数据库版本
             sources = sources,
@@ -81,7 +82,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 autoUpdate = autoUpdate,
                 cacheLimit = cacheLimit,
                 defaultFilterType = defaultFilterType,
-                concurrentCount = concurrentCount
+                concurrentCount = concurrentCount,
+                sourceTimeoutSeconds = sourceTimeoutSeconds
             )
         )
     }
@@ -164,6 +166,12 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 if (count in 1..5) {
                     settingsManager.setConcurrentCount(count)
                 }
+            } catch (e: Exception) {
+                // 忽略错误，使用默认值
+            }
+
+            try {
+                settingsManager.setSourceTimeoutSeconds(backupData.settings.sourceTimeoutSeconds)
             } catch (e: Exception) {
                 // 忽略错误，使用默认值
             }

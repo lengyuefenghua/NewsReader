@@ -34,9 +34,21 @@ class SettingsScreenStateTest {
     }
 
     @Test
+    fun `source timeout should snap to nearest slider anchor`() {
+        assertEquals(5, snapSourceTimeoutSecondsToAnchor(7))
+        assertEquals(60, snapSourceTimeoutSecondsToAnchor(58))
+    }
+
+    @Test
+    fun `source timeout slider index should map back to anchor value`() {
+        assertEquals(15, sourceTimeoutSecondsFromSliderIndex(2f))
+    }
+
+    @Test
     fun `discrete slider value columns should use the same width`() {
         assertEquals(discreteSliderValueWidthDp(), concurrentCountValueWidthDp())
         assertEquals(discreteSliderValueWidthDp(), cacheLimitValueWidthDp())
+        assertEquals(discreteSliderValueWidthDp(), sourceTimeoutValueWidthDp())
     }
 
     @Test

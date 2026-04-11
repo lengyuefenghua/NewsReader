@@ -156,12 +156,16 @@ fun SettingsScreen(
     var concurrentCount by remember {
         mutableIntStateOf(snapConcurrentCountToAnchor(settingsManager.getConcurrentCount()))
     }
+    var sourceTimeoutSeconds by remember {
+        mutableIntStateOf(snapSourceTimeoutSecondsToAnchor(settingsManager.getSourceTimeoutSeconds()))
+    }
     var defaultFilter by remember { mutableStateOf(settingsManager.getDefaultFilterType()) }
     var showRestoreDialog by remember { mutableStateOf(false) }
     var pendingRestoreUri by remember { mutableStateOf<android.net.Uri?>(null) }
     val snappedCacheLimit = snapCacheLimitToAnchor(cacheLimit)
     val cacheLimitSliderIndex = cacheLimitAnchorIndex(cacheLimit).toFloat()
     val concurrentSliderIndex = concurrentCountAnchorIndex(concurrentCount).toFloat()
+    val sourceTimeoutSliderIndex = sourceTimeoutSecondsAnchorIndex(sourceTimeoutSeconds).toFloat()
 
     val backupLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json")
@@ -254,6 +258,33 @@ fun SettingsScreen(
                                 if (newCount != concurrentCount) {
                                     concurrentCount = newCount
                                     settingsManager.setConcurrentCount(newCount)
+                                }
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+
+                SettingRow(label = "订阅源更新超时") {
+                    Row(
+                        modifier = Modifier.width(220.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            "${sourceTimeoutSeconds}s",
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.width(DISCRETE_SLIDER_VALUE_WIDTH)
+                        )
+                        DiscreteDotSlider(
+                            value = sourceTimeoutSliderIndex,
+                            anchorCount = SOURCE_TIMEOUT_SECONDS_ANCHORS.size,
+                            onValueChange = { sliderValue ->
+                                focusManager.clearFocus()
+                                val newTimeout = sourceTimeoutSecondsFromSliderIndex(sliderValue)
+                                if (newTimeout != sourceTimeoutSeconds) {
+                                    sourceTimeoutSeconds = newTimeout
+                                    settingsManager.setSourceTimeoutSeconds(newTimeout)
                                 }
                             },
                             modifier = Modifier.weight(1f)
@@ -385,6 +416,7 @@ internal fun syncCacheLimitDraft(currentDraft: String, persistedLimit: Int): Str
 
 internal val CACHE_LIMIT_ANCHORS = listOf(10, 50, 100, 500, 1000)
 internal val CONCURRENT_COUNT_ANCHORS = listOf(1, 2, 3, 4, 5)
+internal val SOURCE_TIMEOUT_SECONDS_ANCHORS = listOf(5, 10, 15, 30, 60)
 
 internal fun snapToNearestAnchor(value: Int, anchors: List<Int>): Int {
     return anchors.minByOrNull { abs(it - value) } ?: anchors.first()
@@ -416,6 +448,19 @@ internal fun concurrentCountFromSliderIndex(index: Float): Int {
     return CONCURRENT_COUNT_ANCHORS[snappedIndex]
 }
 
+internal fun snapSourceTimeoutSecondsToAnchor(value: Int): Int {
+    return snapToNearestAnchor(value, SOURCE_TIMEOUT_SECONDS_ANCHORS)
+}
+
+internal fun sourceTimeoutSecondsAnchorIndex(value: Int): Int {
+    return SOURCE_TIMEOUT_SECONDS_ANCHORS.indexOf(snapSourceTimeoutSecondsToAnchor(value)).coerceAtLeast(0)
+}
+
+internal fun sourceTimeoutSecondsFromSliderIndex(index: Float): Int {
+    val snappedIndex = index.roundToInt().coerceIn(0, SOURCE_TIMEOUT_SECONDS_ANCHORS.lastIndex)
+    return SOURCE_TIMEOUT_SECONDS_ANCHORS[snappedIndex]
+}
+
 internal fun shouldClearCacheLimitFocusOnImeDone(): Boolean = false
 
 internal fun shouldUseOutlinedCacheLimitField(): Boolean = false
@@ -425,3 +470,5 @@ internal fun discreteSliderValueWidthDp(): Int = 40
 internal fun concurrentCountValueWidthDp(): Int = discreteSliderValueWidthDp()
 
 internal fun cacheLimitValueWidthDp(): Int = discreteSliderValueWidthDp()
+
+internal fun sourceTimeoutValueWidthDp(): Int = discreteSliderValueWidthDp()

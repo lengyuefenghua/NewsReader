@@ -40,6 +40,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -75,19 +76,24 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.lengyuefenghua.newsreader.R
 import java.io.BufferedReader
 import com.lengyuefenghua.newsreader.data.Source
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import com.lengyuefenghua.newsreader.viewmodel.SourceViewModel
 import com.lengyuefenghua.newsreader.viewmodel.SourceWithStat
 import com.lengyuefenghua.newsreader.viewmodel.ImportStrategy
 import com.lengyuefenghua.newsreader.viewmodel.ImportResult
+import com.lengyuefenghua.newsreader.viewmodel.FeedPreviewViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SourceManagerScreen(
     viewModel: SourceViewModel = viewModel(),
-    onOpenAdvanced: () -> Unit = {},
+    previewViewModel: FeedPreviewViewModel = viewModel(),
+    onOpenAdvanced: (String, String) -> Unit = { _, _ -> },
     onEditSource: (Int) -> Unit = {},
-    onSourceClick: (Int) -> Unit = {}
+    onSourceClick: (Int) -> Unit = {},
+    onOpenFeedPreview: () -> Unit = {}
 ) {
     val sourceItems by viewModel.sourcesWithStats.collectAsState()
     val context = LocalContext.current
@@ -96,6 +102,8 @@ fun SourceManagerScreen(
     var isSelectionMode by remember { mutableStateOf(false) }
     val selectedIds = remember { mutableStateListOf<Int>() }
     var showSimpleDialog by remember { mutableStateOf(false) }
+    var isSearchingPreview by remember { mutableStateOf(false) }
+    var previewSearchJob by remember { mutableStateOf<Job?>(null) }
     var showShareMenu by remember { mutableStateOf(false) }
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
     var sourceToDelete by remember { mutableStateOf<Source?>(null) }
@@ -401,26 +409,42 @@ fun SourceManagerScreen(
 
         if (showSimpleDialog) {
             SimpleAddDialog(
-                onDismiss = { showSimpleDialog = false },
-                onConfirm = { name, url ->
-                    coroutineScope.launch {
-                        // [新增] 检查 URL 是否重复
-                        val urlExists = viewModel.isUrlExists(url)
-                        if (urlExists) {
-                            Toast.makeText(context, "该订阅源地址已存在", Toast.LENGTH_SHORT).show()
-                        } else {
-                            val source = Source(name = name, url = url)
-                            viewModel.addSource(source)
-                            Toast.makeText(context, "订阅源已添加", Toast.LENGTH_SHORT).show()
-                            showSimpleDialog = false
+                onDismiss = {
+                    previewSearchJob?.cancel()
+                    previewSearchJob = null
+                    isSearchingPreview = false
+                    showSimpleDialog = false
+                },
+                onConfirm = { _, url ->
+                    val job = coroutineScope.launch {
+                        isSearchingPreview = true
+                        try {
+                            val previewResult = viewModel.fetchFeedPreview(url)
+                            if (previewResult.articles.isNotEmpty()) {
+                                previewViewModel.setPreview(
+                                    title = previewResult.title,
+                                    url = url,
+                                    articles = previewResult.articles,
+                                    iconUrl = previewResult.iconUrl
+                                )
+                                showSimpleDialog = false
+                                onOpenFeedPreview()
+                            } else {
+                                Toast.makeText(context, "未找到可预览的文章，请检查订阅源地址", Toast.LENGTH_SHORT).show()
+                            }
+                        } catch (_: CancellationException) {
+                            // 用户主动取消搜索时不提示错误
+                        } finally {
+                            isSearchingPreview = false
+                            previewSearchJob = null
                         }
                     }
+                    previewSearchJob = job
                 },
-                onSwitchToAdvanced = {
+                onSwitchToAdvanced = { name, url ->
                     showSimpleDialog = false
-                    onOpenAdvanced()
+                    onOpenAdvanced(name, url)
                 },
-                onImportClick = { },
                 onImportFromClipboard = {
                     val clipboardContent = clipboardManager.getText()?.text
                     if (!clipboardContent.isNullOrBlank()) {
@@ -451,9 +475,12 @@ fun SourceManagerScreen(
                         Toast.makeText(context, "剪贴板为空", Toast.LENGTH_SHORT).show()
                     }
                 },
-                onImportFromFile = {
-                    importFileLauncher.launch(arrayOf("*/*"))
-                }
+                onImportFromFile = { importFileLauncher.launch(arrayOf("*/*")) },
+                showNameInput = false,
+                showImportButton = true,
+                confirmText = "搜索",
+                isLoading = isSearchingPreview,
+                loadingText = "正在获取订阅源信息..."
             )
         }
     }
@@ -594,35 +621,66 @@ fun SourceItem(
 fun SimpleAddDialog(
     onDismiss: () -> Unit,
     onConfirm: (String, String) -> Unit,
-    onSwitchToAdvanced: () -> Unit,
-    onImportClick: () -> Unit,
+    onSwitchToAdvanced: (String, String) -> Unit,
     onImportFromClipboard: () -> Unit,
-    onImportFromFile: () -> Unit
+    onImportFromFile: () -> Unit,
+    showNameInput: Boolean = true,
+    showImportButton: Boolean = true,
+    confirmText: String = "保存",
+    initialName: String = "",
+    initialUrl: String = "",
+    isLoading: Boolean = false,
+    loadingText: String = "正在处理..."
 ) {
-    var name by remember { mutableStateOf("") }
-    var url by remember { mutableStateOf("") }
+    var name by remember(initialName) { mutableStateOf(initialName) }
+    var url by remember(initialUrl) { mutableStateOf(initialUrl) }
     var showImportMenu by remember { mutableStateOf(false) }
 
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = {
+            if (!isLoading) {
+                onDismiss()
+            }
+        },
         title = { Text("添加 RSS 订阅") },
         text = {
             Column {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("名称") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(modifier = Modifier.height(8.dp))
+                if (showNameInput) {
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it },
+                        label = { Text("名称") },
+                        singleLine = true,
+                        enabled = !isLoading,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
                 OutlinedTextField(
                     value = url,
                     onValueChange = { url = it },
                     label = { Text("RSS 地址") },
                     singleLine = true,
+                    enabled = !isLoading,
                     modifier = Modifier.fillMaxWidth()
                 )
+                if (isLoading) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp
+                        )
+                        Text(
+                            text = loadingText,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
             }
         },
         confirmButton = {
@@ -631,67 +689,85 @@ fun SimpleAddDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     // 左侧：辅助功能组
-                    TextButton(onClick = { showImportMenu = true }) {
-                        Text("导入")
+                    if (showImportButton) {
+                        TextButton(
+                            enabled = !isLoading,
+                            onClick = { showImportMenu = true }
+                        ) {
+                            Text("导入")
+                        }
                     }
-                    TextButton(onClick = onSwitchToAdvanced) {
+                    TextButton(
+                        enabled = !isLoading,
+                        onClick = { onSwitchToAdvanced(name.trim(), url.trim()) }
+                    ) {
                         Text("自定义")
                     }
                     Spacer(modifier = Modifier.weight(1f))
                     // 右侧：主要操作组
                     TextButton(onClick = onDismiss) { Text("取消") }
-                    TextButton(onClick = {
-                        if (name.isNotBlank() && url.isNotBlank()) onConfirm(name, url)
-                    }) { Text("保存") }
+                    TextButton(
+                        enabled = !isLoading,
+                        onClick = {
+                            val trimmedName = name.trim()
+                            val trimmedUrl = url.trim()
+                            val canSubmit = trimmedUrl.isNotBlank() && (!showNameInput || trimmedName.isNotBlank())
+                            if (canSubmit) onConfirm(trimmedName, trimmedUrl)
+                        }
+                    ) {
+                        Text(confirmText)
+                    }
                 }
 
                 // [优化] 导入选项下拉菜单 - 显示在导入按钮下方
-                DropdownMenu(
-                    expanded = showImportMenu,
-                    onDismissRequest = { showImportMenu = false }
-                ) {
-                    DropdownMenuItem(
-                        text = {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(vertical = 4.dp)
-                            ) {
-                                Icon(
-                                    Icons.Default.ContentCopy,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(20.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Text("从剪贴板导入")
+                if (showImportButton) {
+                    DropdownMenu(
+                        expanded = showImportMenu,
+                        onDismissRequest = { showImportMenu = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(vertical = 4.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.ContentCopy,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(20.dp),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Text("从剪贴板导入")
+                                }
+                            },
+                            onClick = {
+                                showImportMenu = false
+                                onImportFromClipboard()
                             }
-                        },
-                        onClick = {
-                            showImportMenu = false
-                            onImportFromClipboard()
-                        }
-                    )
-                    DropdownMenuItem(
-                        text = {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.padding(vertical = 4.dp)
-                            ) {
-                                Icon(
-                                    Icons.Default.FolderOpen,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(20.dp),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Text("从本地文件导入")
+                        )
+                        DropdownMenuItem(
+                            text = {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.padding(vertical = 4.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.FolderOpen,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(20.dp),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Text("从本地文件导入")
+                                }
+                            },
+                            onClick = {
+                                showImportMenu = false
+                                onImportFromFile()
                             }
-                        },
-                        onClick = {
-                            showImportMenu = false
-                            onImportFromFile()
-                        }
-                    )
+                        )
+                    }
                 }
             }
         }

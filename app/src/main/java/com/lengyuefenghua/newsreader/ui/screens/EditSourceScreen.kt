@@ -52,6 +52,8 @@ import com.lengyuefenghua.newsreader.viewmodel.EditSourceViewModelFactory
 @Composable
 fun EditSourceScreen(
     sourceId: Int = -1,
+    initialName: String = "",
+    initialUrl: String = "",
     onBack: () -> Unit,
     onSave: () -> Unit,
     onDebug: (String) -> Unit
@@ -62,8 +64,8 @@ fun EditSourceScreen(
         factory = EditSourceViewModelFactory(database.sourceDao())
     )
 
-    LaunchedEffect(sourceId) {
-        viewModel.loadSourceIfNeed(sourceId)
+    LaunchedEffect(sourceId, initialName, initialUrl) {
+        viewModel.loadSourceIfNeed(sourceId, initialName, initialUrl)
     }
 
     // Pre-load content description strings

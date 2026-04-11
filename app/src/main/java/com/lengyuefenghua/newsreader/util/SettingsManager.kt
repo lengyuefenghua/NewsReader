@@ -60,14 +60,32 @@ class SettingsManager(context: Context) {
         prefs.edit().putInt(KEY_CONCURRENT_COUNT, validCount).commit()
     }
 
+    fun getSourceTimeoutSeconds(): Int {
+        val value = prefs.getInt(KEY_SOURCE_TIMEOUT_SECONDS, DEFAULT_SOURCE_TIMEOUT_SECONDS)
+        return snapSourceTimeout(value)
+    }
+
+    fun setSourceTimeoutSeconds(seconds: Int) {
+        prefs.edit().putInt(KEY_SOURCE_TIMEOUT_SECONDS, snapSourceTimeout(seconds)).commit()
+    }
+
+    private fun snapSourceTimeout(value: Int): Int {
+        return SOURCE_TIMEOUT_ANCHORS.minByOrNull { kotlin.math.abs(it - value) }
+            ?: DEFAULT_SOURCE_TIMEOUT_SECONDS
+    }
+
     companion object {
         private const val PREFS_NAME = "app_settings"
         private const val KEY_DEFAULT_FILTER_TYPE = "default_filter_type"
         private const val KEY_CONCURRENT_COUNT = "refresh_concurrent_count"
+        private const val KEY_SOURCE_TIMEOUT_SECONDS = "source_timeout_seconds"
 
         // 并发数配置常量
         private const val DEFAULT_CONCURRENT_COUNT = 3
         private const val MIN_CONCURRENT_COUNT = 1
         private const val MAX_CONCURRENT_COUNT = 5
+
+        private const val DEFAULT_SOURCE_TIMEOUT_SECONDS = 10
+        private val SOURCE_TIMEOUT_ANCHORS = listOf(5, 10, 15, 30, 60)
     }
 }

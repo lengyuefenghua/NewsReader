@@ -11,6 +11,12 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+data class RssParseResult(
+    val articles: List<Article>,
+    val title: String?,
+    val iconUrl: String?
+)
+
 class RssParser {
     // 仅用于生成纯文本摘要时清洗标签
     private val htmlTagRemoveRegex = Regex("<[^>]*>")
@@ -21,7 +27,7 @@ class RssParser {
         "<h1", "<h2", "<h3", "<h4", "<h5", "<h6", "<img", "<iframe"
     )
 
-    fun parse(inputStream: InputStream, sourceName: String): Pair<List<Article>, String?> {
+    fun parse(inputStream: InputStream, sourceName: String): RssParseResult {
         // [修改] 预处理步骤：读取流 -> 清洗特殊字符 -> 转回流
         // 1. 读取原始内容
         val rawContent = inputStream.bufferedReader().use { it.readText() }
@@ -49,8 +55,8 @@ class RssParser {
                     if (parser.name == "rss" || parser.name == "feed") {
                         LogUtils.log("┍解析文章列表<${parser.name}>")
                         val result = readFeed(parser, sourceName)
-                        val articles = result.first
-                        val iconUrl = result.second
+                        val articles = result.articles
+                        val iconUrl = result.iconUrl
                         
                         LogUtils.log("┕${articles.size}篇文章")
                         
@@ -83,13 +89,14 @@ class RssParser {
                 }
                 eventType = parser.next()
             }
-            return Pair(emptyList(), null)
+            return RssParseResult(emptyList(), null, null)
         }
     }
 
     // [修改] 兼容 RSS 的 <channel> 结构和 Atom 的直接 <entry> 结构
-    private fun readFeed(parser: XmlPullParser, sourceName: String): Pair<List<Article>, String?> {
+    private fun readFeed(parser: XmlPullParser, sourceName: String): RssParseResult {
         val entries = mutableListOf<Article>()
+        var title: String? = null
         var iconUrl: String? = null
 
         while (parser.next() != XmlPullParser.END_TAG) {
@@ -98,12 +105,16 @@ class RssParser {
             // RSS 结构: rss -> channel -> item
             if (parser.name == "channel") {
                 val result = readChannel(parser, sourceName)
-                entries.addAll(result.first)
-                iconUrl = result.second
+                entries.addAll(result.articles)
+                title = result.title
+                iconUrl = result.iconUrl
             }
             // Atom 结构: feed -> entry (直接在根节点下)
             else if (parser.name == "entry") {
                 readEntry(parser, sourceName)?.let { entries.add(it) }
+            }
+            else if (parser.name == "title" && title.isNullOrBlank()) {
+                title = readText(parser)
             }
             // Atom 图标
             else if (parser.name == "icon" || parser.name == "logo") {
@@ -112,18 +123,21 @@ class RssParser {
                 skip(parser)
             }
         }
-        return Pair(entries, iconUrl)
+        return RssParseResult(entries, title, iconUrl)
     }
 
-    private fun readChannel(parser: XmlPullParser, sourceName: String): Pair<List<Article>, String?> {
+    private fun readChannel(parser: XmlPullParser, sourceName: String): RssParseResult {
         val entries = mutableListOf<Article>()
+        var title: String? = null
         var iconUrl: String? = null
 
         while (parser.next() != XmlPullParser.END_TAG) {
             if (parser.eventType != XmlPullParser.START_TAG) continue
             val tagName = parser.name
 
-            if (tagName == "item") {
+            if (tagName == "title" && title.isNullOrBlank()) {
+                title = readText(parser)
+            } else if (tagName == "item") {
                 readEntry(parser, sourceName)?.let { entries.add(it) }
             } else if (tagName == "image") {
                 iconUrl = readRssImage(parser)
@@ -131,7 +145,7 @@ class RssParser {
                 skip(parser)
             }
         }
-        return Pair(entries, iconUrl)
+        return RssParseResult(entries, title, iconUrl)
     }
 
     // RSS <image> 包含 <url>

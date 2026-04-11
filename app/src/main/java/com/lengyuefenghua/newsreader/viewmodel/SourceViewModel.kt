@@ -48,10 +48,11 @@ data class SourceWithStat(
 
 class SourceViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val db = (application as NewsReaderApplication).database
+    private val app = application as NewsReaderApplication
+    private val db = app.database
     private val dao = db.sourceDao()
     private val articleDao = db.articleDao() // 需要操作文章表
-    private val repository = NewsRepository(db)
+    private val repository = NewsRepository(db, app.settingsManager)
 
     // [修改] 开启 PrettyPrinting 和宽松解析模式
     private val gson = GsonBuilder()
@@ -155,6 +156,10 @@ class SourceViewModel(application: Application) : AndroidViewModel(application) 
         return withContext(Dispatchers.IO) {
             url in dao.getAllUrls()
         }
+    }
+
+    suspend fun fetchFeedPreview(url: String): NewsRepository.FeedPreviewResult {
+        return repository.fetchFeedPreview(url)
     }
 
     // [修改] 导入订阅源，支持策略选择

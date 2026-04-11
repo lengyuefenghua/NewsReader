@@ -94,8 +94,8 @@ object DebugHelper {
             log(sb, "┍解析文章列表<RSS/Atom Standard>")
             val rssParser = RssParser()
             val result = rssParser.parse(xml.byteInputStream(), source.name)
-            val items = result.first
-            val iconUrl = result.second
+            val items = result.articles
+            val iconUrl = result.iconUrl
 
             log(sb, "┕${items.size}篇文章")
 

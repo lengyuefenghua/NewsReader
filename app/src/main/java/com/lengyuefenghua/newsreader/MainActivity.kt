@@ -24,6 +24,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.lifecycle.viewmodel.compose.viewModel
 import org.koin.androidx.compose.koinViewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
@@ -38,12 +39,15 @@ import com.lengyuefenghua.newsreader.ui.screens.ArticleReadingContext
 import com.lengyuefenghua.newsreader.ui.screens.ArticleReadingSession
 import com.lengyuefenghua.newsreader.ui.screens.DebugConsoleScreen
 import com.lengyuefenghua.newsreader.ui.screens.EditSourceScreen
+import com.lengyuefenghua.newsreader.ui.screens.FeedPreviewScreen
 import com.lengyuefenghua.newsreader.ui.screens.FavoritesScreen
 import com.lengyuefenghua.newsreader.ui.screens.ProfileScreen
 import com.lengyuefenghua.newsreader.ui.screens.SettingsScreen
 import com.lengyuefenghua.newsreader.ui.screens.SourceManagerScreen
 import com.lengyuefenghua.newsreader.ui.screens.StatsScreen
 import com.lengyuefenghua.newsreader.ui.screens.TimelineScreen
+import com.lengyuefenghua.newsreader.viewmodel.FeedPreviewViewModel
+import com.lengyuefenghua.newsreader.viewmodel.SourceViewModel
 import com.lengyuefenghua.newsreader.viewmodel.TimelineViewModel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -67,6 +71,8 @@ sealed class Screen(val route: String, val title: String, val icon: ImageVector)
 fun NewsReaderApp() {
     val navController = rememberNavController()
     val timelineViewModel: TimelineViewModel = koinViewModel()
+    val sourceViewModel: SourceViewModel = viewModel()
+    val feedPreviewViewModel: FeedPreviewViewModel = viewModel()
     val scope = rememberCoroutineScope()
     // 获取 Prefs Repo
     val application =
@@ -136,9 +142,41 @@ fun NewsReaderApp() {
 
             composable(Screen.Sources.route) {
                 SourceManagerScreen(
-                    onOpenAdvanced = { navController.navigate("source_edit") },
-                    onEditSource = { sourceId -> navController.navigate("source_edit?id=$sourceId") },
-                    onSourceClick = { sourceId -> navController.navigate(NavRoutes.sourceFeed(sourceId)) }
+                    viewModel = sourceViewModel,
+                    previewViewModel = feedPreviewViewModel,
+                    onOpenAdvanced = { name, url ->
+                        navController.navigate(NavRoutes.sourceEdit(name = name, url = url))
+                    },
+                    onEditSource = { sourceId -> navController.navigate(NavRoutes.sourceEdit(id = sourceId)) },
+                    onSourceClick = { sourceId -> navController.navigate(NavRoutes.sourceFeed(sourceId)) },
+                    onOpenFeedPreview = { navController.navigate(NavRoutes.FEED_PREVIEW) }
+                )
+            }
+
+            composable(NavRoutes.FEED_PREVIEW) {
+                FeedPreviewScreen(
+                    previewViewModel = feedPreviewViewModel,
+                    sourceViewModel = sourceViewModel,
+                    onBack = {
+                        feedPreviewViewModel.clearPreview()
+                        navController.popBackStack()
+                    },
+                    onArticleClick = { url, articles ->
+                        ArticleReadingSession.open(
+                            ArticleReadingContext(
+                                articles = articles,
+                                currentUrl = url,
+                            )
+                        )
+                        navController.navigate(NavRoutes.article(url))
+                    },
+                    onOpenAdvanced = { name, url ->
+                        navController.navigate(NavRoutes.sourceEdit(name = name, url = url))
+                    },
+                    onSubscribed = {
+                        feedPreviewViewModel.clearPreview()
+                        navController.popBackStack()
+                    }
                 )
             }
 
@@ -231,23 +269,26 @@ fun NewsReaderApp() {
                         }
                     }
                 }
-                val initialArticle = remember { timelineViewModel.getArticleByUrl(url) }
+                val preview by feedPreviewViewModel.preview.collectAsState()
+                val previewArticle = preview?.articles?.find { it.url == url }
+                val initialArticle = remember(url, previewArticle) {
+                    timelineViewModel.getArticleByUrl(url) ?: previewArticle
+                }
                 val article by timelineViewModel.getArticleFlow(url)
                     .collectAsState(initial = initialArticle)
+                val displayedArticle = article ?: previewArticle
                 ArticleScreen(
-                    article = article,
+                    article = displayedArticle,
                     previousTitle = readingContext?.previousTitle,
                     nextTitle = readingContext?.nextTitle,
                     previousUrl = readingContext?.previousUrl,
                     nextUrl = readingContext?.nextUrl,
                     onBack = { navController.popBackStack() },
-                    onMarkRead = { article?.let { timelineViewModel.markAsRead(it.id) } },
-                    onToggleFavorite = { article?.let { timelineViewModel.toggleFavorite(it) } },
+                    onMarkRead = { displayedArticle?.let { timelineViewModel.markAsRead(it.id) } },
+                    onToggleFavorite = { displayedArticle?.let { timelineViewModel.toggleFavorite(it) } },
                     onEditSource = { sourceName ->
                         timelineViewModel.findSourceIdAndEdit(sourceName) { id ->
-                            navController.navigate(
-                                "source_edit?id=$id"
-                            )
+                            navController.navigate(NavRoutes.sourceEdit(id = id))
                         }
                     },
                     // [新增] 计时回调
@@ -273,14 +314,29 @@ fun NewsReaderApp() {
             }
 
             composable(
-                "source_edit?id={id}",
-                arguments = listOf(navArgument("id") { type = NavType.IntType; defaultValue = -1 })
+                route = NavRoutes.SOURCE_EDIT,
+                arguments = listOf(
+                    navArgument(NavRoutes.SOURCE_EDIT_ID_ARG) { type = NavType.IntType; defaultValue = -1 },
+                    navArgument(NavRoutes.SOURCE_EDIT_NAME_ARG) { type = NavType.StringType; defaultValue = "" },
+                    navArgument(NavRoutes.SOURCE_EDIT_URL_ARG) { type = NavType.StringType; defaultValue = "" }
+                )
             ) { backStackEntry ->
-                val id = backStackEntry.arguments?.getInt("id") ?: -1
+                val id = backStackEntry.arguments?.getInt(NavRoutes.SOURCE_EDIT_ID_ARG) ?: -1
+                val initialName = backStackEntry.arguments?.getString(NavRoutes.SOURCE_EDIT_NAME_ARG).orEmpty()
+                val initialUrl = backStackEntry.arguments?.getString(NavRoutes.SOURCE_EDIT_URL_ARG).orEmpty()
                 EditSourceScreen(
                     sourceId = id,
+                    initialName = initialName,
+                    initialUrl = initialUrl,
                     onBack = { navController.popBackStack() },
-                    onSave = { navController.popBackStack() },
+                    onSave = {
+                        if (id == -1 && initialUrl.isNotBlank()) {
+                            feedPreviewViewModel.clearPreview()
+                            navController.popBackStack(Screen.Sources.route, false)
+                        } else {
+                            navController.popBackStack()
+                        }
+                    },
                     onDebug = { json -> navController.navigate("debug_console/$json") })
             }
 

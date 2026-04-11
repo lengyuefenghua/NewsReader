@@ -6,17 +6,31 @@ import com.lengyuefenghua.newsreader.core.domain.model.Result
 import com.lengyuefenghua.newsreader.utils.HtmlParser
 import com.lengyuefenghua.newsreader.utils.LogUtils
 import com.lengyuefenghua.newsreader.utils.RssParser
+import com.lengyuefenghua.newsreader.util.SettingsManager
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import okhttp3.Call
+import okhttp3.Callback
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.Response
+import java.io.IOException
+import java.net.URI
 import java.util.concurrent.Semaphore
+import java.util.concurrent.TimeUnit
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
-class NewsRepository(private val database: AppDatabase) {
+class NewsRepository(
+    private val database: AppDatabase,
+    private val settingsManager: SettingsManager
+) {
 
     private val sourceDao = database.sourceDao()
     private val articleDao = database.articleDao()
@@ -24,6 +38,18 @@ class NewsRepository(private val database: AppDatabase) {
     private val client = OkHttpClient()
     private val rssParser = RssParser()
     private val htmlParser = HtmlParser()
+
+    private data class HttpResponsePayload(
+        val code: Int,
+        val isSuccessful: Boolean,
+        val body: String?
+    )
+
+    data class FeedPreviewResult(
+        val title: String?,
+        val articles: List<Article>,
+        val iconUrl: String?
+    )
 
     val allArticles: Flow<List<Article>> = articleDao.getAllArticlesFlow()
 
@@ -188,7 +214,6 @@ class NewsRepository(private val database: AppDatabase) {
      * 用于检测订阅源是否包含完整正文
      */
     suspend fun fetchArticles(source: Source): List<Article> = withContext(Dispatchers.IO) {
-        val startTime = System.currentTimeMillis()
         try {
             val currentUserAgent = if (source.enablePcUserAgent) UA_PC else UA_ANDROID
 
@@ -197,23 +222,66 @@ class NewsRepository(private val database: AppDatabase) {
                 .header("User-Agent", currentUserAgent)
                 .build()
 
-            val response = client.newCall(request).execute()
-            val responseString = response.body?.string()
+            val response = executeRequest(request)
+            val responseString = response.body
 
             if (response.isSuccessful && responseString != null) {
                 val items: List<Article> = if (source.isCustom) {
                     htmlParser.parse(responseString, source)
                 } else {
                     val result = rssParser.parse(responseString.byteInputStream(), source.name)
-                    result.first
+                    result.articles
                 }
                 items
             } else {
                 emptyList()
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.e("NewsRepository", "获取文章失败", e)
             emptyList()
+        }
+    }
+
+    suspend fun fetchFeedPreview(url: String): FeedPreviewResult = withContext(Dispatchers.IO) {
+        val fallbackTitle = runCatching { URI(url).host.orEmpty().removePrefix("www.") }
+            .getOrDefault("")
+            .ifBlank { url }
+        val source = Source(name = fallbackTitle, url = url)
+
+        try {
+            val request = Request.Builder()
+                .url(source.url)
+                .header("User-Agent", UA_ANDROID)
+                .build()
+
+            val response = executeRequest(request)
+            val responseString = response.body
+
+            if (!response.isSuccessful || responseString.isNullOrBlank()) {
+                return@withContext FeedPreviewResult(
+                    title = fallbackTitle,
+                    articles = emptyList(),
+                    iconUrl = null
+                )
+            }
+
+            val result = rssParser.parse(responseString.byteInputStream(), source.name)
+            FeedPreviewResult(
+                title = result.title?.ifBlank { fallbackTitle } ?: fallbackTitle,
+                articles = result.articles,
+                iconUrl = result.iconUrl
+            )
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.e("NewsRepository", "预览抓取失败", e)
+            FeedPreviewResult(
+                title = fallbackTitle,
+                articles = emptyList(),
+                iconUrl = null
+            )
         }
     }
 
@@ -235,8 +303,8 @@ class NewsRepository(private val database: AppDatabase) {
                 .header("User-Agent", currentUserAgent)
                 .build()
 
-            val response = client.newCall(request).execute()
-            val responseString = response.body?.string()
+            val response = executeRequest(request)
+            val responseString = response.body
 
             if (response.isSuccessful && responseString != null) {
                 val kbSize = responseString.length / 1024
@@ -248,8 +316,8 @@ class NewsRepository(private val database: AppDatabase) {
                     items = htmlParser.parse(responseString, source)
                 } else {
                     val result = rssParser.parse(responseString.byteInputStream(), source.name)
-                    items = result.first
-                    val iconUrl = result.second
+                    items = result.articles
+                    val iconUrl = result.iconUrl
 
                     if (!iconUrl.isNullOrBlank()) {
                          LogUtils.log("┍解析订阅源图标")
@@ -279,6 +347,8 @@ class NewsRepository(private val database: AppDatabase) {
             } else {
                  LogUtils.log("加载失败：HTTP状态：${response.code}")
             }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             LogUtils.log("同步失败 [${source.name}]: ${e.message}")
             Log.e("NewsReader", "同步失败", e)
@@ -287,5 +357,41 @@ class NewsRepository(private val database: AppDatabase) {
         val endTime = System.currentTimeMillis()
         LogUtils.log("解析完成：${endTime - startTime}毫秒")
         return 0
+    }
+
+    private fun requestClient(): OkHttpClient {
+        val timeoutSeconds = settingsManager.getSourceTimeoutSeconds().toLong()
+        return client.newBuilder()
+            .connectTimeout(timeoutSeconds, TimeUnit.SECONDS)
+            .readTimeout(timeoutSeconds, TimeUnit.SECONDS)
+            .writeTimeout(timeoutSeconds, TimeUnit.SECONDS)
+            .callTimeout(timeoutSeconds, TimeUnit.SECONDS)
+            .build()
+    }
+
+    private suspend fun executeRequest(request: Request): HttpResponsePayload {
+        return suspendCancellableCoroutine { continuation ->
+            val call = requestClient().newCall(request)
+            continuation.invokeOnCancellation { call.cancel() }
+            call.enqueue(object : Callback {
+                override fun onFailure(call: Call, e: IOException) {
+                    if (continuation.isCancelled) return
+                    continuation.resumeWithException(e)
+                }
+
+                override fun onResponse(call: Call, response: Response) {
+                    response.use {
+                        if (!continuation.isActive) return
+                        continuation.resume(
+                            HttpResponsePayload(
+                                code = response.code,
+                                isSuccessful = response.isSuccessful,
+                                body = response.body?.string()
+                            )
+                        )
+                    }
+                }
+            })
+        }
     }
 }
