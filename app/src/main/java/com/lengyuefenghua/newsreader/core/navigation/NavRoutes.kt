@@ -13,6 +13,18 @@ object NavRoutes {
     const val PLINK_FEED_PREVIEW = "plink_feed_preview?name={name}&url={url}"
     const val PLINK_FEED_PREVIEW_NAME_ARG = "name"
     const val PLINK_FEED_PREVIEW_URL_ARG = "url"
+    const val AWESOME_RSSHUB_MARKET = "awesome_rsshub_market"
+    const val AWESOME_RSSHUB_FEED_PREVIEW = "awesome_rsshub_feed_preview?name={name}&url={url}"
+    const val AWESOME_RSSHUB_FEED_PREVIEW_NAME_ARG = "name"
+    const val AWESOME_RSSHUB_FEED_PREVIEW_URL_ARG = "url"
+    const val TOP_RSS_LIST_MARKET = "top_rss_list_market"
+    const val TOP_RSS_LIST_FEED_PREVIEW = "top_rss_list_feed_preview?name={name}&url={url}"
+    const val TOP_RSS_LIST_FEED_PREVIEW_NAME_ARG = "name"
+    const val TOP_RSS_LIST_FEED_PREVIEW_URL_ARG = "url"
+    const val WECHAT2RSS_MARKET = "wechat2rss_market"
+    const val WECHAT2RSS_FEED_PREVIEW = "wechat2rss_feed_preview?name={name}&url={url}"
+    const val WECHAT2RSS_FEED_PREVIEW_NAME_ARG = "name"
+    const val WECHAT2RSS_FEED_PREVIEW_URL_ARG = "url"
 
     const val ARTICLE = "article/{url}"
     const val ARTICLE_ARG = "url"
@@ -40,6 +52,24 @@ object NavRoutes {
         val encodedName = URLEncoder.encode(name, StandardCharsets.UTF_8.toString())
         val encodedUrl = URLEncoder.encode(url, StandardCharsets.UTF_8.toString())
         return "plink_feed_preview?name=$encodedName&url=$encodedUrl"
+    }
+
+    fun awesomeRssHubFeedPreview(name: String, url: String): String {
+        val encodedName = URLEncoder.encode(name, StandardCharsets.UTF_8.toString())
+        val encodedUrl = URLEncoder.encode(url, StandardCharsets.UTF_8.toString())
+        return "awesome_rsshub_feed_preview?name=$encodedName&url=$encodedUrl"
+    }
+
+    fun topRssListFeedPreview(name: String, url: String): String {
+        val encodedName = URLEncoder.encode(name, StandardCharsets.UTF_8.toString())
+        val encodedUrl = URLEncoder.encode(url, StandardCharsets.UTF_8.toString())
+        return "top_rss_list_feed_preview?name=$encodedName&url=$encodedUrl"
+    }
+
+    fun wechat2RssFeedPreview(name: String, url: String): String {
+        val encodedName = URLEncoder.encode(name, StandardCharsets.UTF_8.toString())
+        val encodedUrl = URLEncoder.encode(url, StandardCharsets.UTF_8.toString())
+        return "wechat2rss_feed_preview?name=$encodedName&url=$encodedUrl"
     }
 
     fun sourceEdit(id: Int = -1, name: String = "", url: String = ""): String {

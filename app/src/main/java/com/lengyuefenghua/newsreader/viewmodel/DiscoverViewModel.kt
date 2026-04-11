@@ -25,22 +25,72 @@ class DiscoverViewModel(application: Application) : AndroidViewModel(application
     private val _plinkState = MutableStateFlow(DiscoverUiState())
     val plinkState: StateFlow<DiscoverUiState> = _plinkState.asStateFlow()
 
+    private val _awesomeRssHubState = MutableStateFlow(DiscoverUiState())
+    val awesomeRssHubState: StateFlow<DiscoverUiState> = _awesomeRssHubState.asStateFlow()
+
+    private val _topRssListState = MutableStateFlow(DiscoverUiState())
+    val topRssListState: StateFlow<DiscoverUiState> = _topRssListState.asStateFlow()
+
+    private val _wechat2RssState = MutableStateFlow(DiscoverUiState())
+    val wechat2RssState: StateFlow<DiscoverUiState> = _wechat2RssState.asStateFlow()
+
     fun loadPlinkFeeds(forceRefresh: Boolean = false) {
-        val currentState = _plinkState.value
+        loadCatalog(
+            stateFlow = _plinkState,
+            forceRefresh = forceRefresh,
+            loader = repository::fetchPlinkFeedGroups,
+            defaultErrorMessage = "加载 Plink 订阅市场失败"
+        )
+    }
+
+    fun loadAwesomeRssHubFeeds(forceRefresh: Boolean = false) {
+        loadCatalog(
+            stateFlow = _awesomeRssHubState,
+            forceRefresh = forceRefresh,
+            loader = repository::fetchAwesomeRssHubFeedGroups,
+            defaultErrorMessage = "加载 Awesome RSSHub Routes 订阅市场失败"
+        )
+    }
+
+    fun loadTopRssListFeeds(forceRefresh: Boolean = false) {
+        loadCatalog(
+            stateFlow = _topRssListState,
+            forceRefresh = forceRefresh,
+            loader = repository::fetchTopRssListFeedGroups,
+            defaultErrorMessage = "加载 Top RSS List 订阅市场失败"
+        )
+    }
+
+    fun loadWechat2RssFeeds(forceRefresh: Boolean = false) {
+        loadCatalog(
+            stateFlow = _wechat2RssState,
+            forceRefresh = forceRefresh,
+            loader = repository::fetchWechat2RssFeedGroups,
+            defaultErrorMessage = "加载 Wechat2RSS 订阅市场失败"
+        )
+    }
+
+    private fun loadCatalog(
+        stateFlow: MutableStateFlow<DiscoverUiState>,
+        forceRefresh: Boolean,
+        loader: suspend () -> List<NewsRepository.FeedCatalogGroup>,
+        defaultErrorMessage: String
+    ) {
+        val currentState = stateFlow.value
         if (currentState.isLoading) return
         if (!forceRefresh && currentState.groups.isNotEmpty() && currentState.error == null) return
 
         viewModelScope.launch {
-            _plinkState.value = currentState.copy(isLoading = true, error = null)
+            stateFlow.value = currentState.copy(isLoading = true, error = null)
             try {
-                val groups = repository.fetchPlinkFeedGroups()
-                _plinkState.value = DiscoverUiState(groups = groups)
+                val groups = loader()
+                stateFlow.value = DiscoverUiState(groups = groups)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                _plinkState.value = currentState.copy(
+                stateFlow.value = currentState.copy(
                     isLoading = false,
-                    error = e.message ?: "加载 Plink 订阅市场失败"
+                    error = e.message ?: defaultErrorMessage
                 )
             }
         }

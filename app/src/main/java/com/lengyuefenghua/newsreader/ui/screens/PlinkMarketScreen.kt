@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ExpandLess
@@ -38,6 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.lengyuefenghua.newsreader.data.NewsRepository
+import com.lengyuefenghua.newsreader.viewmodel.DiscoverUiState
 import com.lengyuefenghua.newsreader.viewmodel.DiscoverViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -48,23 +50,109 @@ fun PlinkMarketScreen(
     onOpenFeedPreview: (String, String) -> Unit
 ) {
     val state by discoverViewModel.plinkState.collectAsState()
-    var collapsedGroups by rememberSaveable { mutableStateOf(listOf<String>()) }
-
     LaunchedEffect(Unit) {
         discoverViewModel.loadPlinkFeeds()
     }
 
+    FeedCatalogMarketScreen(
+        title = "Plink",
+        sourceUrl = NewsRepository.PLINK_URL,
+        state = state,
+        onBack = onBack,
+        onRefresh = { discoverViewModel.loadPlinkFeeds(forceRefresh = true) },
+        onOpenFeedPreview = onOpenFeedPreview
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AwesomeRssHubRoutesMarketScreen(
+    discoverViewModel: DiscoverViewModel,
+    onBack: () -> Unit,
+    onOpenFeedPreview: (String, String) -> Unit
+) {
+    val state by discoverViewModel.awesomeRssHubState.collectAsState()
+    LaunchedEffect(Unit) {
+        discoverViewModel.loadAwesomeRssHubFeeds()
+    }
+
+    FeedCatalogMarketScreen(
+        title = "Awesome RSSHub Routes",
+        sourceUrl = NewsRepository.AWESOME_RSSHUB_ROUTES_URL,
+        state = state,
+        onBack = onBack,
+        onRefresh = { discoverViewModel.loadAwesomeRssHubFeeds(forceRefresh = true) },
+        onOpenFeedPreview = onOpenFeedPreview
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TopRssListMarketScreen(
+    discoverViewModel: DiscoverViewModel,
+    onBack: () -> Unit,
+    onOpenFeedPreview: (String, String) -> Unit
+) {
+    val state by discoverViewModel.topRssListState.collectAsState()
+    LaunchedEffect(Unit) {
+        discoverViewModel.loadTopRssListFeeds()
+    }
+
+    FeedCatalogMarketScreen(
+        title = "Top RSS List",
+        sourceUrl = NewsRepository.TOP_RSS_LIST_URL,
+        state = state,
+        onBack = onBack,
+        onRefresh = { discoverViewModel.loadTopRssListFeeds(forceRefresh = true) },
+        onOpenFeedPreview = onOpenFeedPreview
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun Wechat2RssMarketScreen(
+    discoverViewModel: DiscoverViewModel,
+    onBack: () -> Unit,
+    onOpenFeedPreview: (String, String) -> Unit
+) {
+    val state by discoverViewModel.wechat2RssState.collectAsState()
+    LaunchedEffect(Unit) {
+        discoverViewModel.loadWechat2RssFeeds()
+    }
+
+    FeedCatalogMarketScreen(
+        title = "Wechat2RSS",
+        sourceUrl = NewsRepository.WECHAT2RSS_URL,
+        state = state,
+        onBack = onBack,
+        onRefresh = { discoverViewModel.loadWechat2RssFeeds(forceRefresh = true) },
+        onOpenFeedPreview = onOpenFeedPreview
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FeedCatalogMarketScreen(
+    title: String,
+    sourceUrl: String,
+    state: DiscoverUiState,
+    onBack: () -> Unit,
+    onRefresh: () -> Unit,
+    onOpenFeedPreview: (String, String) -> Unit
+) {
+    var collapsedGroups by rememberSaveable { mutableStateOf(listOf<String>()) }
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Plink") },
+                title = { Text(title) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
                     }
                 },
                 actions = {
-                    IconButton(onClick = { discoverViewModel.loadPlinkFeeds(forceRefresh = true) }) {
+                    IconButton(onClick = onRefresh) {
                         Icon(Icons.Default.Refresh, contentDescription = "刷新")
                     }
                 }
@@ -99,7 +187,7 @@ fun PlinkMarketScreen(
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.error
                         )
-                        TextButton(onClick = { discoverViewModel.loadPlinkFeeds(forceRefresh = true) }) {
+                        TextButton(onClick = onRefresh) {
                             Text("重试")
                         }
                     }
@@ -130,7 +218,7 @@ fun PlinkMarketScreen(
                 ) {
                     item {
                         Text(
-                            text = NewsRepository.PLINK_URL,
+                            text = sourceUrl,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.primary
                         )
@@ -167,10 +255,10 @@ fun PlinkMarketScreen(
                         }
 
                         if (!isCollapsed) {
-                            items(
+                            itemsIndexed(
                                 items = group.feeds,
-                                key = { feed -> "${group.name}:${feed.url}" }
-                            ) { feed ->
+                                key = { index, feed -> "${group.name}:${feed.url}:$index" }
+                            ) { _, feed ->
                                 Card(
                                     modifier = Modifier
                                         .fillMaxWidth()

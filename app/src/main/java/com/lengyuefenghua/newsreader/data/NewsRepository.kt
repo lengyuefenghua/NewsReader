@@ -21,6 +21,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
 import org.jsoup.Jsoup
+import org.jsoup.parser.Parser
 import java.io.IOException
 import java.net.URI
 import java.util.concurrent.Semaphore
@@ -69,6 +70,11 @@ class NewsRepository(
 
     companion object {
         const val PLINK_URL = "https://plink.anyfeeder.com/"
+        const val AWESOME_RSSHUB_ROUTES_URL = "https://jackyst0.github.io/awesome-rsshub-routes/"
+        const val AWESOME_RSSHUB_ROUTES_OPML_URL = "${AWESOME_RSSHUB_ROUTES_URL}feeds.opml"
+        const val TOP_RSS_LIST_URL = "https://github.com/weekend-project-space/top-rss-list/blob/main/README.md"
+        const val TOP_RSS_LIST_RAW_URL = "https://raw.githubusercontent.com/weekend-project-space/top-rss-list/main/README.md"
+        const val WECHAT2RSS_URL = "https://wechat2rss.xlab.app/list/all.html"
         const val UA_ANDROID =
             "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
         const val UA_PC =
@@ -297,33 +303,29 @@ class NewsRepository(
         }
     }
 
-    suspend fun fetchPlinkFeedGroups(): List<FeedCatalogGroup> = withContext(Dispatchers.IO) {
-        try {
-            val request = Request.Builder()
-                .url(PLINK_URL)
-                .header("User-Agent", UA_ANDROID)
-                .build()
+    suspend fun fetchPlinkFeedGroups(): List<FeedCatalogGroup> = fetchFeedCatalogGroups(
+        requestUrl = PLINK_URL,
+        sourceName = "Plink",
+        parser = ::parsePlinkFeedGroups
+    )
 
-            val response = executeRequest(request)
-            val responseString = response.body
+    suspend fun fetchAwesomeRssHubFeedGroups(): List<FeedCatalogGroup> = fetchFeedCatalogGroups(
+        requestUrl = AWESOME_RSSHUB_ROUTES_OPML_URL,
+        sourceName = "Awesome RSSHub Routes",
+        parser = ::parseAwesomeRssHubFeedGroups
+    )
 
-            if (!response.isSuccessful || responseString.isNullOrBlank()) {
-                throw IOException("Plink 页面加载失败：HTTP ${response.code}")
-            }
+    suspend fun fetchTopRssListFeedGroups(): List<FeedCatalogGroup> = fetchFeedCatalogGroups(
+        requestUrl = TOP_RSS_LIST_RAW_URL,
+        sourceName = "Top RSS List",
+        parser = ::parseTopRssListFeedGroups
+    )
 
-            val groups = parsePlinkFeedGroups(responseString)
-            if (groups.isEmpty()) {
-                throw IOException("Plink 页面中未解析到订阅源")
-            }
-
-            groups
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            Log.e("NewsRepository", "加载 Plink 订阅市场失败", e)
-            throw e
-        }
-    }
+    suspend fun fetchWechat2RssFeedGroups(): List<FeedCatalogGroup> = fetchFeedCatalogGroups(
+        requestUrl = WECHAT2RSS_URL,
+        sourceName = "Wechat2RSS",
+        parser = ::parseWechat2RssFeedGroups
+    )
 
     private suspend fun fetchAndSave(source: Source): Int {
         val startTime = System.currentTimeMillis()
@@ -434,6 +436,225 @@ class NewsRepository(
                     FeedCatalogGroup(name = groupName, feeds = feeds)
                 }
             }
+    }
+
+    private fun parseAwesomeRssHubFeedGroups(opml: String): List<FeedCatalogGroup> {
+        val doc = Jsoup.parse(opml, AWESOME_RSSHUB_ROUTES_OPML_URL, Parser.xmlParser())
+        val body = doc.selectFirst("body") ?: return emptyList()
+
+        return body.children()
+            .filter { it.tagName().equals("outline", ignoreCase = true) }
+            .mapNotNull { groupElement ->
+                val groupName = readOutlineTitle(groupElement)
+                val feeds = groupElement.children()
+                    .filter { it.tagName().equals("outline", ignoreCase = true) }
+                    .mapNotNull { feedElement ->
+                        val name = readOutlineTitle(feedElement)
+                        val url = feedElement.attr("xmlUrl").ifBlank { feedElement.attr("xmlurl") }.trim()
+                        if (name.isBlank() || url.isBlank()) {
+                            null
+                        } else {
+                            FeedCatalogSource(name = name, url = url)
+                        }
+                    }
+
+                if (groupName.isBlank() || feeds.isEmpty()) {
+                    null
+                } else {
+                    FeedCatalogGroup(name = groupName, feeds = feeds)
+                }
+            }
+    }
+
+    private fun parseTopRssListFeedGroups(markdown: String): List<FeedCatalogGroup> {
+        val groups = mutableListOf<FeedCatalogGroup>()
+        var currentGroupName: String? = null
+        val currentFeeds = mutableListOf<FeedCatalogSource>()
+        var inTable = false
+
+        fun flushGroup() {
+            val groupName = currentGroupName.orEmpty().trim()
+            if (groupName.isNotBlank() && currentFeeds.isNotEmpty()) {
+                groups += FeedCatalogGroup(name = groupName, feeds = currentFeeds.toList())
+            }
+            currentFeeds.clear()
+            inTable = false
+        }
+
+        markdown.lineSequence().forEach { rawLine ->
+            val line = rawLine.trim()
+            when {
+                line.startsWith("## ") || line.startsWith("### ") -> {
+                    flushGroup()
+                    currentGroupName = line.removePrefix("## ").removePrefix("### ").trim()
+                }
+
+                currentGroupName != null && line.startsWith("|") -> {
+                    val cells = parseMarkdownTableRow(line)
+                    if (cells.size < 2) {
+                        return@forEach
+                    }
+
+                    if (isMarkdownTableSeparator(cells)) {
+                        return@forEach
+                    }
+
+                    if (cells[0] == "名称" && cells[1] == "源") {
+                        inTable = true
+                        return@forEach
+                    }
+
+                    if (!inTable) {
+                        return@forEach
+                    }
+
+                    val url = extractMarkdownLinkTarget(cells[1])
+                    if (url.isBlank()) {
+                        return@forEach
+                    }
+
+                    val title = normalizeCatalogSourceName(cells[0], url)
+                    currentFeeds += FeedCatalogSource(name = title, url = url)
+                }
+            }
+        }
+
+        flushGroup()
+        return groups
+    }
+
+    private fun parseWechat2RssFeedGroups(html: String): List<FeedCatalogGroup> {
+        val doc = Jsoup.parse(html, WECHAT2RSS_URL)
+        val contentRoot = doc.selectFirst(".vp-doc._list_all > div") ?: return emptyList()
+        val groups = mutableListOf<FeedCatalogGroup>()
+        var currentGroupName: String? = null
+        val currentFeeds = mutableListOf<FeedCatalogSource>()
+
+        fun flushGroup() {
+            val groupName = currentGroupName.orEmpty().trim()
+            if (groupName.isNotBlank() && currentFeeds.isNotEmpty()) {
+                groups += FeedCatalogGroup(name = groupName, feeds = currentFeeds.toList())
+            }
+            currentFeeds.clear()
+        }
+
+        contentRoot.children().forEach { element ->
+            if (element.tagName().equals("h2", ignoreCase = true)) {
+                flushGroup()
+                currentGroupName = element.ownText()
+                    .ifBlank { element.text() }
+                    .replace("\u200B", "")
+                    .trim()
+                return@forEach
+            }
+
+            if (currentGroupName.isNullOrBlank()) {
+                return@forEach
+            }
+
+            element.select("a[href^=https://wechat2rss.xlab.app/feed/][href$=.xml]")
+                .mapNotNull { link ->
+                    val url = link.absUrl("href").ifBlank { link.attr("href").trim() }
+                    if (url.isBlank()) {
+                        null
+                    } else {
+                        FeedCatalogSource(
+                            name = normalizeCatalogSourceName(link.text(), url),
+                            url = url
+                        )
+                    }
+                }
+                .forEach(currentFeeds::add)
+        }
+
+        flushGroup()
+        return groups
+    }
+
+    private fun readOutlineTitle(element: org.jsoup.nodes.Element): String {
+        return element.attr("title")
+            .ifBlank { element.attr("text") }
+            .trim()
+    }
+
+    private fun parseMarkdownTableRow(line: String): List<String> {
+        return line.trim()
+            .removePrefix("|")
+            .removeSuffix("|")
+            .split("|")
+            .map { it.trim() }
+    }
+
+    private fun isMarkdownTableSeparator(cells: List<String>): Boolean {
+        val separatorRegex = Regex(":?-{3,}:?")
+        return cells.all { cell ->
+            val normalized = cell.replace(" ", "")
+            normalized.isNotBlank() && separatorRegex.matches(normalized)
+        }
+    }
+
+    private fun extractMarkdownLinkTarget(cell: String): String {
+        val markdownLink = Regex("\\[[^\\]]*]\\((https?://[^)]+)\\)")
+            .find(cell)
+            ?.groupValues
+            ?.getOrNull(1)
+            .orEmpty()
+
+        if (markdownLink.isNotBlank()) {
+            return markdownLink.trim()
+        }
+
+        return Regex("https?://[^\\s)]+")
+            .find(cell)
+            ?.value
+            .orEmpty()
+            .trim()
+    }
+
+    private fun normalizeCatalogSourceName(rawName: String, url: String): String {
+        val name = rawName
+            .replace(Regex("\\[([^\\]]*)]\\(([^)]+)\\)"), "$1")
+            .trim()
+
+        if (name.isNotBlank()) {
+            return name
+        }
+
+        return runCatching { URI(url).host.orEmpty().removePrefix("www.") }
+            .getOrDefault("")
+            .ifBlank { url }
+    }
+
+    private suspend fun fetchFeedCatalogGroups(
+        requestUrl: String,
+        sourceName: String,
+        parser: (String) -> List<FeedCatalogGroup>
+    ): List<FeedCatalogGroup> = withContext(Dispatchers.IO) {
+        try {
+            val request = Request.Builder()
+                .url(requestUrl)
+                .header("User-Agent", UA_ANDROID)
+                .build()
+
+            val response = executeRequest(request)
+            val responseString = response.body
+
+            if (!response.isSuccessful || responseString.isNullOrBlank()) {
+                throw IOException("$sourceName 页面加载失败：HTTP ${response.code}")
+            }
+
+            val groups = parser(responseString)
+            if (groups.isEmpty()) {
+                throw IOException("$sourceName 中未解析到订阅源")
+            }
+
+            groups
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.e("NewsRepository", "加载 $sourceName 订阅市场失败", e)
+            throw e
+        }
     }
 
     private suspend fun executeRequest(request: Request): HttpResponsePayload {

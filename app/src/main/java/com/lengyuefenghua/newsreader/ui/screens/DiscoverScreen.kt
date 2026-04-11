@@ -23,19 +23,42 @@ import com.lengyuefenghua.newsreader.data.NewsRepository
 private data class DiscoverPlugin(
     val title: String,
     val subtitle: String,
-    val description: String
+    val description: String,
+    val onClick: () -> Unit
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DiscoverScreen(
-    onOpenPlink: () -> Unit
+    onOpenPlink: () -> Unit,
+    onOpenAwesomeRssHub: () -> Unit,
+    onOpenTopRssList: () -> Unit,
+    onOpenWechat2Rss: () -> Unit
 ) {
     val plugins = listOf(
         DiscoverPlugin(
             title = "Plink",
             subtitle = NewsRepository.PLINK_URL,
-            description = "快速添加现有订阅市场中的 RSS 源"
+            description = "快速添加现有订阅市场中的 RSS 源",
+            onClick = onOpenPlink
+        ),
+        DiscoverPlugin(
+            title = "Awesome RSSHub Routes",
+            subtitle = NewsRepository.AWESOME_RSSHUB_ROUTES_URL,
+            description = "导入官方 RSS 与 RSSHub 路由目录中的公开订阅源",
+            onClick = onOpenAwesomeRssHub
+        ),
+        DiscoverPlugin(
+            title = "Top RSS List",
+            subtitle = NewsRepository.TOP_RSS_LIST_URL,
+            description = "浏览 ifeed 热门订阅榜单里的公开 RSS 源",
+            onClick = onOpenTopRssList
+        ),
+        DiscoverPlugin(
+            title = "Wechat2RSS",
+            subtitle = NewsRepository.WECHAT2RSS_URL,
+            description = "浏览 Wechat2RSS 整理的公开公众号 RSS 列表",
+            onClick = onOpenWechat2Rss
         )
     )
 
@@ -66,11 +89,7 @@ fun DiscoverScreen(
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable {
-                            if (plugin.title == "Plink") {
-                                onOpenPlink()
-                            }
-                        }
+                        .clickable(onClick = plugin.onClick)
                 ) {
                     Column(
                         modifier = Modifier.padding(16.dp),

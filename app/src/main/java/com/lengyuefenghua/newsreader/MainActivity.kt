@@ -43,13 +43,16 @@ import com.lengyuefenghua.newsreader.ui.screens.DiscoverScreen
 import com.lengyuefenghua.newsreader.ui.screens.EditSourceScreen
 import com.lengyuefenghua.newsreader.ui.screens.FeedPreviewScreen
 import com.lengyuefenghua.newsreader.ui.screens.FavoritesScreen
+import com.lengyuefenghua.newsreader.ui.screens.AwesomeRssHubRoutesMarketScreen
 import com.lengyuefenghua.newsreader.ui.screens.PlinkMarketScreen
 import com.lengyuefenghua.newsreader.ui.screens.PlinkFeedPreviewScreen
 import com.lengyuefenghua.newsreader.ui.screens.ProfileScreen
 import com.lengyuefenghua.newsreader.ui.screens.SettingsScreen
 import com.lengyuefenghua.newsreader.ui.screens.SourceManagerScreen
 import com.lengyuefenghua.newsreader.ui.screens.StatsScreen
+import com.lengyuefenghua.newsreader.ui.screens.TopRssListMarketScreen
 import com.lengyuefenghua.newsreader.ui.screens.TimelineScreen
+import com.lengyuefenghua.newsreader.ui.screens.Wechat2RssMarketScreen
 import com.lengyuefenghua.newsreader.viewmodel.DiscoverViewModel
 import com.lengyuefenghua.newsreader.viewmodel.FeedPreviewViewModel
 import com.lengyuefenghua.newsreader.viewmodel.PlinkFeedPreviewViewModel
@@ -165,7 +168,10 @@ fun NewsReaderApp() {
 
             composable(Screen.Discover.route) {
                 DiscoverScreen(
-                    onOpenPlink = { navController.navigate(NavRoutes.PLINK_MARKET) }
+                    onOpenPlink = { navController.navigate(NavRoutes.PLINK_MARKET) },
+                    onOpenAwesomeRssHub = { navController.navigate(NavRoutes.AWESOME_RSSHUB_MARKET) },
+                    onOpenTopRssList = { navController.navigate(NavRoutes.TOP_RSS_LIST_MARKET) },
+                    onOpenWechat2Rss = { navController.navigate(NavRoutes.WECHAT2RSS_MARKET) }
                 )
             }
 
@@ -175,6 +181,36 @@ fun NewsReaderApp() {
                     onBack = { navController.popBackStack() },
                     onOpenFeedPreview = { name, url ->
                         navController.navigate(NavRoutes.plinkFeedPreview(name, url))
+                    }
+                )
+            }
+
+            composable(NavRoutes.AWESOME_RSSHUB_MARKET) {
+                AwesomeRssHubRoutesMarketScreen(
+                    discoverViewModel = discoverViewModel,
+                    onBack = { navController.popBackStack() },
+                    onOpenFeedPreview = { name, url ->
+                        navController.navigate(NavRoutes.awesomeRssHubFeedPreview(name, url))
+                    }
+                )
+            }
+
+            composable(NavRoutes.TOP_RSS_LIST_MARKET) {
+                TopRssListMarketScreen(
+                    discoverViewModel = discoverViewModel,
+                    onBack = { navController.popBackStack() },
+                    onOpenFeedPreview = { name, url ->
+                        navController.navigate(NavRoutes.topRssListFeedPreview(name, url))
+                    }
+                )
+            }
+
+            composable(NavRoutes.WECHAT2RSS_MARKET) {
+                Wechat2RssMarketScreen(
+                    discoverViewModel = discoverViewModel,
+                    onBack = { navController.popBackStack() },
+                    onOpenFeedPreview = { name, url ->
+                        navController.navigate(NavRoutes.wechat2RssFeedPreview(name, url))
                     }
                 )
             }
@@ -217,6 +253,132 @@ fun NewsReaderApp() {
                     onSubscribed = {
                         plinkFeedPreviewViewModel.clearPreview()
                         navController.popBackStack(NavRoutes.PLINK_MARKET, false)
+                    }
+                )
+            }
+
+            composable(
+                route = NavRoutes.AWESOME_RSSHUB_FEED_PREVIEW,
+                arguments = listOf(
+                    navArgument(NavRoutes.AWESOME_RSSHUB_FEED_PREVIEW_NAME_ARG) {
+                        type = NavType.StringType
+                        defaultValue = ""
+                    },
+                    navArgument(NavRoutes.AWESOME_RSSHUB_FEED_PREVIEW_URL_ARG) {
+                        type = NavType.StringType
+                    }
+                )
+            ) { backStackEntry ->
+                val title = backStackEntry.arguments?.getString(NavRoutes.AWESOME_RSSHUB_FEED_PREVIEW_NAME_ARG).orEmpty()
+                val url = backStackEntry.arguments?.getString(NavRoutes.AWESOME_RSSHUB_FEED_PREVIEW_URL_ARG).orEmpty()
+                PlinkFeedPreviewScreen(
+                    title = title,
+                    url = url,
+                    viewModel = plinkFeedPreviewViewModel,
+                    sourceViewModel = sourceViewModel,
+                    onBack = {
+                        plinkFeedPreviewViewModel.clearPreview()
+                        navController.popBackStack()
+                    },
+                    onArticleClick = { articleUrl, articles ->
+                        ArticleReadingSession.open(
+                            ArticleReadingContext(
+                                articles = articles,
+                                currentUrl = articleUrl,
+                            )
+                        )
+                        navController.navigate(NavRoutes.article(articleUrl))
+                    },
+                    onOpenAdvanced = { name, targetUrl ->
+                        navController.navigate(NavRoutes.sourceEdit(name = name, url = targetUrl))
+                    },
+                    onSubscribed = {
+                        plinkFeedPreviewViewModel.clearPreview()
+                        navController.popBackStack(NavRoutes.AWESOME_RSSHUB_MARKET, false)
+                    }
+                )
+            }
+
+            composable(
+                route = NavRoutes.TOP_RSS_LIST_FEED_PREVIEW,
+                arguments = listOf(
+                    navArgument(NavRoutes.TOP_RSS_LIST_FEED_PREVIEW_NAME_ARG) {
+                        type = NavType.StringType
+                        defaultValue = ""
+                    },
+                    navArgument(NavRoutes.TOP_RSS_LIST_FEED_PREVIEW_URL_ARG) {
+                        type = NavType.StringType
+                    }
+                )
+            ) { backStackEntry ->
+                val title = backStackEntry.arguments?.getString(NavRoutes.TOP_RSS_LIST_FEED_PREVIEW_NAME_ARG).orEmpty()
+                val url = backStackEntry.arguments?.getString(NavRoutes.TOP_RSS_LIST_FEED_PREVIEW_URL_ARG).orEmpty()
+                PlinkFeedPreviewScreen(
+                    title = title,
+                    url = url,
+                    viewModel = plinkFeedPreviewViewModel,
+                    sourceViewModel = sourceViewModel,
+                    onBack = {
+                        plinkFeedPreviewViewModel.clearPreview()
+                        navController.popBackStack()
+                    },
+                    onArticleClick = { articleUrl, articles ->
+                        ArticleReadingSession.open(
+                            ArticleReadingContext(
+                                articles = articles,
+                                currentUrl = articleUrl,
+                            )
+                        )
+                        navController.navigate(NavRoutes.article(articleUrl))
+                    },
+                    onOpenAdvanced = { name, targetUrl ->
+                        navController.navigate(NavRoutes.sourceEdit(name = name, url = targetUrl))
+                    },
+                    onSubscribed = {
+                        plinkFeedPreviewViewModel.clearPreview()
+                        navController.popBackStack(NavRoutes.TOP_RSS_LIST_MARKET, false)
+                    }
+                )
+            }
+
+            composable(
+                route = NavRoutes.WECHAT2RSS_FEED_PREVIEW,
+                arguments = listOf(
+                    navArgument(NavRoutes.WECHAT2RSS_FEED_PREVIEW_NAME_ARG) {
+                        type = NavType.StringType
+                        defaultValue = ""
+                    },
+                    navArgument(NavRoutes.WECHAT2RSS_FEED_PREVIEW_URL_ARG) {
+                        type = NavType.StringType
+                    }
+                )
+            ) { backStackEntry ->
+                val title = backStackEntry.arguments?.getString(NavRoutes.WECHAT2RSS_FEED_PREVIEW_NAME_ARG).orEmpty()
+                val url = backStackEntry.arguments?.getString(NavRoutes.WECHAT2RSS_FEED_PREVIEW_URL_ARG).orEmpty()
+                PlinkFeedPreviewScreen(
+                    title = title,
+                    url = url,
+                    viewModel = plinkFeedPreviewViewModel,
+                    sourceViewModel = sourceViewModel,
+                    onBack = {
+                        plinkFeedPreviewViewModel.clearPreview()
+                        navController.popBackStack()
+                    },
+                    onArticleClick = { articleUrl, articles ->
+                        ArticleReadingSession.open(
+                            ArticleReadingContext(
+                                articles = articles,
+                                currentUrl = articleUrl,
+                            )
+                        )
+                        navController.navigate(NavRoutes.article(articleUrl))
+                    },
+                    onOpenAdvanced = { name, targetUrl ->
+                        navController.navigate(NavRoutes.sourceEdit(name = name, url = targetUrl))
+                    },
+                    onSubscribed = {
+                        plinkFeedPreviewViewModel.clearPreview()
+                        navController.popBackStack(NavRoutes.WECHAT2RSS_MARKET, false)
                     }
                 )
             }
@@ -422,6 +584,21 @@ fun NewsReaderApp() {
                                 NavRoutes.PLINK_FEED_PREVIEW -> {
                                     plinkFeedPreviewViewModel.clearPreview()
                                     navController.popBackStack(NavRoutes.PLINK_MARKET, false)
+                                }
+
+                                NavRoutes.AWESOME_RSSHUB_FEED_PREVIEW -> {
+                                    plinkFeedPreviewViewModel.clearPreview()
+                                    navController.popBackStack(NavRoutes.AWESOME_RSSHUB_MARKET, false)
+                                }
+
+                                NavRoutes.TOP_RSS_LIST_FEED_PREVIEW -> {
+                                    plinkFeedPreviewViewModel.clearPreview()
+                                    navController.popBackStack(NavRoutes.TOP_RSS_LIST_MARKET, false)
+                                }
+
+                                NavRoutes.WECHAT2RSS_FEED_PREVIEW -> {
+                                    plinkFeedPreviewViewModel.clearPreview()
+                                    navController.popBackStack(NavRoutes.WECHAT2RSS_MARKET, false)
                                 }
 
                                 else -> {
