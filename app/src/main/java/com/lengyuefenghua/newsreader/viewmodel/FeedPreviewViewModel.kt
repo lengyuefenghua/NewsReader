@@ -19,13 +19,18 @@ class FeedPreviewViewModel : ViewModel() {
     private val _preview = MutableStateFlow<FeedPreview?>(null)
     val preview: StateFlow<FeedPreview?> = _preview.asStateFlow()
 
+    private val _returnRoute = MutableStateFlow<String?>(null)
+    val returnRoute: StateFlow<String?> = _returnRoute.asStateFlow()
+
     fun setPreview(
         title: String?,
         url: String,
         articles: List<Article>,
-        iconUrl: String?
+        iconUrl: String?,
+        returnRoute: String? = null
     ) {
         val displayTitle = resolveDisplayTitle(title, url)
+        _returnRoute.value = returnRoute
         _preview.value = FeedPreview(
             displayTitle = displayTitle,
             url = url,
@@ -36,6 +41,11 @@ class FeedPreviewViewModel : ViewModel() {
 
     fun clearPreview() {
         _preview.value = null
+    }
+
+    fun clearPreviewSession() {
+        _preview.value = null
+        _returnRoute.value = null
     }
 
     fun hasPreview(): Boolean = _preview.value != null

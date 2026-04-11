@@ -8,6 +8,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Public
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -38,15 +39,20 @@ import com.lengyuefenghua.newsreader.ui.screens.ArticleScreen
 import com.lengyuefenghua.newsreader.ui.screens.ArticleReadingContext
 import com.lengyuefenghua.newsreader.ui.screens.ArticleReadingSession
 import com.lengyuefenghua.newsreader.ui.screens.DebugConsoleScreen
+import com.lengyuefenghua.newsreader.ui.screens.DiscoverScreen
 import com.lengyuefenghua.newsreader.ui.screens.EditSourceScreen
 import com.lengyuefenghua.newsreader.ui.screens.FeedPreviewScreen
 import com.lengyuefenghua.newsreader.ui.screens.FavoritesScreen
+import com.lengyuefenghua.newsreader.ui.screens.PlinkMarketScreen
+import com.lengyuefenghua.newsreader.ui.screens.PlinkFeedPreviewScreen
 import com.lengyuefenghua.newsreader.ui.screens.ProfileScreen
 import com.lengyuefenghua.newsreader.ui.screens.SettingsScreen
 import com.lengyuefenghua.newsreader.ui.screens.SourceManagerScreen
 import com.lengyuefenghua.newsreader.ui.screens.StatsScreen
 import com.lengyuefenghua.newsreader.ui.screens.TimelineScreen
+import com.lengyuefenghua.newsreader.viewmodel.DiscoverViewModel
 import com.lengyuefenghua.newsreader.viewmodel.FeedPreviewViewModel
+import com.lengyuefenghua.newsreader.viewmodel.PlinkFeedPreviewViewModel
 import com.lengyuefenghua.newsreader.viewmodel.SourceViewModel
 import com.lengyuefenghua.newsreader.viewmodel.TimelineViewModel
 import kotlinx.coroutines.flow.first
@@ -64,6 +70,7 @@ class MainActivity : ComponentActivity() {
 sealed class Screen(val route: String, val title: String, val icon: ImageVector) {
     object Timeline : Screen(NavRoutes.TIMELINE, "时间线", Icons.Filled.Home)
     object Sources : Screen(NavRoutes.SOURCES, "订阅", Icons.AutoMirrored.Filled.List)
+    object Discover : Screen(NavRoutes.DISCOVER, "发现", Icons.Filled.Public)
     object Profile : Screen(NavRoutes.PROFILE, "我的", Icons.Filled.Person)
 }
 
@@ -72,7 +79,10 @@ fun NewsReaderApp() {
     val navController = rememberNavController()
     val timelineViewModel: TimelineViewModel = koinViewModel()
     val sourceViewModel: SourceViewModel = viewModel()
+    val discoverViewModel: DiscoverViewModel = viewModel()
     val feedPreviewViewModel: FeedPreviewViewModel = viewModel()
+    val plinkFeedPreviewViewModel: PlinkFeedPreviewViewModel = viewModel()
+    val previewReturnRoute by feedPreviewViewModel.returnRoute.collectAsState()
     val scope = rememberCoroutineScope()
     // 获取 Prefs Repo
     val application =
@@ -88,13 +98,13 @@ fun NewsReaderApp() {
         }
     }
 
-    val items = listOf(Screen.Timeline, Screen.Sources, Screen.Profile)
+    val items = listOf(Screen.Timeline, Screen.Sources, Screen.Discover, Screen.Profile)
 
     Scaffold(
         bottomBar = {
             val navBackStackEntry by navController.currentBackStackEntryAsState()
             val currentRoute = navBackStackEntry?.destination?.route
-            if (currentRoute == Screen.Timeline.route || currentRoute == Screen.Sources.route || currentRoute == Screen.Profile.route) {
+            if (currentRoute == Screen.Timeline.route || currentRoute == Screen.Sources.route || currentRoute == Screen.Discover.route || currentRoute == Screen.Profile.route) {
                 NavigationBar {
                     items.forEach { screen ->
                         NavigationBarItem(
@@ -153,13 +163,79 @@ fun NewsReaderApp() {
                 )
             }
 
+            composable(Screen.Discover.route) {
+                DiscoverScreen(
+                    onOpenPlink = { navController.navigate(NavRoutes.PLINK_MARKET) }
+                )
+            }
+
+            composable(NavRoutes.PLINK_MARKET) {
+                PlinkMarketScreen(
+                    discoverViewModel = discoverViewModel,
+                    onBack = { navController.popBackStack() },
+                    onOpenFeedPreview = { name, url ->
+                        navController.navigate(NavRoutes.plinkFeedPreview(name, url))
+                    }
+                )
+            }
+
+            composable(
+                route = NavRoutes.PLINK_FEED_PREVIEW,
+                arguments = listOf(
+                    navArgument(NavRoutes.PLINK_FEED_PREVIEW_NAME_ARG) {
+                        type = NavType.StringType
+                        defaultValue = ""
+                    },
+                    navArgument(NavRoutes.PLINK_FEED_PREVIEW_URL_ARG) {
+                        type = NavType.StringType
+                    }
+                )
+            ) { backStackEntry ->
+                val title = backStackEntry.arguments?.getString(NavRoutes.PLINK_FEED_PREVIEW_NAME_ARG).orEmpty()
+                val url = backStackEntry.arguments?.getString(NavRoutes.PLINK_FEED_PREVIEW_URL_ARG).orEmpty()
+                PlinkFeedPreviewScreen(
+                    title = title,
+                    url = url,
+                    viewModel = plinkFeedPreviewViewModel,
+                    sourceViewModel = sourceViewModel,
+                    onBack = {
+                        plinkFeedPreviewViewModel.clearPreview()
+                        navController.popBackStack()
+                    },
+                    onArticleClick = { articleUrl, articles ->
+                        ArticleReadingSession.open(
+                            ArticleReadingContext(
+                                articles = articles,
+                                currentUrl = articleUrl,
+                            )
+                        )
+                        navController.navigate(NavRoutes.article(articleUrl))
+                    },
+                    onOpenAdvanced = { name, targetUrl ->
+                        navController.navigate(NavRoutes.sourceEdit(name = name, url = targetUrl))
+                    },
+                    onSubscribed = {
+                        plinkFeedPreviewViewModel.clearPreview()
+                        navController.popBackStack(NavRoutes.PLINK_MARKET, false)
+                    }
+                )
+            }
+
             composable(NavRoutes.FEED_PREVIEW) {
                 FeedPreviewScreen(
                     previewViewModel = feedPreviewViewModel,
                     sourceViewModel = sourceViewModel,
                     onBack = {
-                        feedPreviewViewModel.clearPreview()
-                        navController.popBackStack()
+                        val targetRoute = previewReturnRoute
+                        feedPreviewViewModel.clearPreviewSession()
+                        val popped = if (!targetRoute.isNullOrBlank()) {
+                            navController.popBackStack(targetRoute, false)
+                        } else {
+                            false
+                        }
+                        if (!popped) {
+                            navController.popBackStack()
+                        }
                     },
                     onArticleClick = { url, articles ->
                         ArticleReadingSession.open(
@@ -174,8 +250,16 @@ fun NewsReaderApp() {
                         navController.navigate(NavRoutes.sourceEdit(name = name, url = url))
                     },
                     onSubscribed = {
-                        feedPreviewViewModel.clearPreview()
-                        navController.popBackStack()
+                        val targetRoute = previewReturnRoute
+                        feedPreviewViewModel.clearPreviewSession()
+                        val popped = if (!targetRoute.isNullOrBlank()) {
+                            navController.popBackStack(targetRoute, false)
+                        } else {
+                            false
+                        }
+                        if (!popped) {
+                            navController.popBackStack()
+                        }
                     }
                 )
             }
@@ -270,7 +354,9 @@ fun NewsReaderApp() {
                     }
                 }
                 val preview by feedPreviewViewModel.preview.collectAsState()
+                val plinkPreview by plinkFeedPreviewViewModel.uiState.collectAsState()
                 val previewArticle = preview?.articles?.find { it.url == url }
+                    ?: plinkPreview.preview?.articles?.find { it.url == url }
                 val initialArticle = remember(url, previewArticle) {
                     timelineViewModel.getArticleByUrl(url) ?: previewArticle
                 }
@@ -330,9 +416,19 @@ fun NewsReaderApp() {
                     initialUrl = initialUrl,
                     onBack = { navController.popBackStack() },
                     onSave = {
+                        val previousRoute = navController.previousBackStackEntry?.destination?.route
                         if (id == -1 && initialUrl.isNotBlank()) {
-                            feedPreviewViewModel.clearPreview()
-                            navController.popBackStack(Screen.Sources.route, false)
+                            when (previousRoute) {
+                                NavRoutes.PLINK_FEED_PREVIEW -> {
+                                    plinkFeedPreviewViewModel.clearPreview()
+                                    navController.popBackStack(NavRoutes.PLINK_MARKET, false)
+                                }
+
+                                else -> {
+                                    feedPreviewViewModel.clearPreviewSession()
+                                    navController.popBackStack(Screen.Sources.route, false)
+                                }
+                            }
                         } else {
                             navController.popBackStack()
                         }

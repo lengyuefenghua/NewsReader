@@ -20,6 +20,7 @@ import okhttp3.Callback
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
+import org.jsoup.Jsoup
 import java.io.IOException
 import java.net.URI
 import java.util.concurrent.Semaphore
@@ -51,12 +52,23 @@ class NewsRepository(
         val iconUrl: String?
     )
 
+    data class FeedCatalogSource(
+        val name: String,
+        val url: String
+    )
+
+    data class FeedCatalogGroup(
+        val name: String,
+        val feeds: List<FeedCatalogSource>
+    )
+
     val allArticles: Flow<List<Article>> = articleDao.getAllArticlesFlow()
 
     // [新增] 暴露所有 Source 用于获取图标
     fun getAllSources(): Flow<List<Source>> = sourceDao.getAllSources()
 
     companion object {
+        const val PLINK_URL = "https://plink.anyfeeder.com/"
         const val UA_ANDROID =
             "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
         const val UA_PC =
@@ -285,6 +297,34 @@ class NewsRepository(
         }
     }
 
+    suspend fun fetchPlinkFeedGroups(): List<FeedCatalogGroup> = withContext(Dispatchers.IO) {
+        try {
+            val request = Request.Builder()
+                .url(PLINK_URL)
+                .header("User-Agent", UA_ANDROID)
+                .build()
+
+            val response = executeRequest(request)
+            val responseString = response.body
+
+            if (!response.isSuccessful || responseString.isNullOrBlank()) {
+                throw IOException("Plink 页面加载失败：HTTP ${response.code}")
+            }
+
+            val groups = parsePlinkFeedGroups(responseString)
+            if (groups.isEmpty()) {
+                throw IOException("Plink 页面中未解析到订阅源")
+            }
+
+            groups
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Log.e("NewsRepository", "加载 Plink 订阅市场失败", e)
+            throw e
+        }
+    }
+
     private suspend fun fetchAndSave(source: Source): Int {
         val startTime = System.currentTimeMillis()
         try {
@@ -367,6 +407,33 @@ class NewsRepository(
             .writeTimeout(timeoutSeconds, TimeUnit.SECONDS)
             .callTimeout(timeoutSeconds, TimeUnit.SECONDS)
             .build()
+    }
+
+    private fun parsePlinkFeedGroups(html: String): List<FeedCatalogGroup> {
+        val doc = Jsoup.parse(html, PLINK_URL)
+        val feedsContainer = doc.selectFirst(".feeds") ?: return emptyList()
+
+        return feedsContainer.children()
+            .filter { it.hasClass("feed-group") }
+            .mapNotNull { groupElement ->
+                val groupName = groupElement.selectFirst("h3")?.text()?.trim().orEmpty()
+                val feeds = groupElement.select(".feed-list a[href]")
+                    .mapNotNull { link ->
+                        val name = link.text().trim()
+                        val url = link.absUrl("href").ifBlank { link.attr("href").trim() }
+                        if (name.isBlank() || url.isBlank()) {
+                            null
+                        } else {
+                            FeedCatalogSource(name = name, url = url)
+                        }
+                    }
+
+                if (groupName.isBlank() || feeds.isEmpty()) {
+                    null
+                } else {
+                    FeedCatalogGroup(name = groupName, feeds = feeds)
+                }
+            }
     }
 
     private suspend fun executeRequest(request: Request): HttpResponsePayload {

@@ -74,6 +74,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.lengyuefenghua.newsreader.R
+import com.lengyuefenghua.newsreader.core.navigation.NavRoutes
 import java.io.BufferedReader
 import com.lengyuefenghua.newsreader.data.Source
 import kotlinx.coroutines.CancellationException
@@ -425,7 +426,8 @@ fun SourceManagerScreen(
                                     title = previewResult.title,
                                     url = url,
                                     articles = previewResult.articles,
-                                    iconUrl = previewResult.iconUrl
+                                    iconUrl = previewResult.iconUrl,
+                                    returnRoute = NavRoutes.SOURCES
                                 )
                                 showSimpleDialog = false
                                 onOpenFeedPreview()

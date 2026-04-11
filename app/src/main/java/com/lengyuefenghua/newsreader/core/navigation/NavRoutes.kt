@@ -6,8 +6,13 @@ import java.nio.charset.StandardCharsets
 object NavRoutes {
     const val TIMELINE = "timeline"
     const val SOURCES = "sources"
+    const val DISCOVER = "discover"
     const val PROFILE = "profile"
     const val FEED_PREVIEW = "feed_preview"
+    const val PLINK_MARKET = "plink_market"
+    const val PLINK_FEED_PREVIEW = "plink_feed_preview?name={name}&url={url}"
+    const val PLINK_FEED_PREVIEW_NAME_ARG = "name"
+    const val PLINK_FEED_PREVIEW_URL_ARG = "url"
 
     const val ARTICLE = "article/{url}"
     const val ARTICLE_ARG = "url"
@@ -30,6 +35,12 @@ object NavRoutes {
     }
 
     fun sourceFeed(sourceId: Int): String = "source_feed/$sourceId"
+
+    fun plinkFeedPreview(name: String, url: String): String {
+        val encodedName = URLEncoder.encode(name, StandardCharsets.UTF_8.toString())
+        val encodedUrl = URLEncoder.encode(url, StandardCharsets.UTF_8.toString())
+        return "plink_feed_preview?name=$encodedName&url=$encodedUrl"
+    }
 
     fun sourceEdit(id: Int = -1, name: String = "", url: String = ""): String {
         val encodedName = URLEncoder.encode(name, StandardCharsets.UTF_8.toString())
