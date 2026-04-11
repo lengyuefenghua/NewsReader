@@ -22,7 +22,7 @@
 如果你对仓库完全没有上下文，按以下顺序阅读：
 
 1. `AGENTS.md`
-2. `docs/README.md`
+2. `README.md`
 3. `app/src/main/java/com/lengyuefenghua/newsreader/NewsReaderApplication.kt`
 4. `app/src/main/java/com/lengyuefenghua/newsreader/MainActivity.kt`
 5. `app/src/main/java/com/lengyuefenghua/newsreader/viewmodel/TimelineViewModel.kt`
@@ -429,7 +429,7 @@ SettingsScreen
 
 在你需要快速建立全局认知时，优先读这些文件：
 
-- `docs/README.md`：产品功能层面的总览
+- `README.md`：产品功能层面的总览
 - `docs/DiscoverSourceGuide.md`：发现源与订阅市场接入手册，包含直连解析模式与 WebView 借壳模式
 - `AGENTS.md`：仓库工作流与安全规则
 - `app/src/main/java/com/lengyuefenghua/newsreader/NewsReaderApplication.kt`：启动入口
