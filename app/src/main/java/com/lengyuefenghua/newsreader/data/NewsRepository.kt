@@ -60,45 +60,40 @@ class NewsRepository(private val database: AppDatabase) {
                 return@withContext Result.Success(RefreshSummary(0, 0, 0))
             }
 
-            // 创建 Semaphore 限制并发数
             val semaphore = Semaphore(concurrentLimit)
             val total = sources.size
-            var totalNewArticles = 0
             var failedSources = 0
             val completedCount = java.util.concurrent.atomic.AtomicInteger(0)
 
-            // 并发刷新每个订阅源
             val deferredResults = sources.map { source ->
                 async {
                     semaphore.acquire()
                     try {
                         val newCount = fetchAndSave(source)
-
-                        // 发送进度回调并累加新增文章数
                         val current = completedCount.incrementAndGet()
-                        onProgress(RefreshProgress(
-                            sourceName = source.name,
-                            success = true,
-                            newArticleCount = newCount,
-                            current = current,
-                            total = total
-                        ))
-
+                        onProgress(
+                            RefreshProgress(
+                                sourceName = source.name,
+                                success = true,
+                                newArticleCount = newCount,
+                                current = current,
+                                total = total
+                            )
+                        )
                         newCount
                     } catch (e: Exception) {
                         Log.e("NewsRepository", "刷新失败: ${source.name}", e)
-
-                        // 单源失败不影响其他源
                         failedSources++
                         val current = completedCount.incrementAndGet()
-                        onProgress(RefreshProgress(
-                            sourceName = source.name,
-                            success = false,
-                            newArticleCount = 0,
-                            current = current,
-                            total = total
-                        ))
-
+                        onProgress(
+                            RefreshProgress(
+                                sourceName = source.name,
+                                success = false,
+                                newArticleCount = 0,
+                                current = current,
+                                total = total
+                            )
+                        )
                         0
                     } finally {
                         semaphore.release()
@@ -106,15 +101,43 @@ class NewsRepository(private val database: AppDatabase) {
                 }
             }
 
-            // 等待所有并发任务完成并累加结果
-            val results = deferredResults.awaitAll()
-            totalNewArticles = results.sum()
+            val totalNewArticles = deferredResults.awaitAll().sum()
 
-            Result.Success(RefreshSummary(
-                totalNewArticles = totalNewArticles,
-                totalSources = total,
-                failedSources = failedSources
-            ))
+            Result.Success(
+                RefreshSummary(
+                    totalNewArticles = totalNewArticles,
+                    totalSources = total,
+                    failedSources = failedSources
+                )
+            )
+        } catch (e: Exception) {
+            when (e) {
+                is java.net.UnknownHostException -> {
+                    Result.Error(NetworkError.NetworkException("网络连接失败", e))
+                }
+                is java.net.SocketTimeoutException -> {
+                    Result.Error(NetworkError.NetworkException("连接超时", e))
+                }
+                else -> {
+                    Result.Error(NetworkError.UnknownError("同步失败: ${e.message}", e))
+                }
+            }
+        }
+    }
+
+    suspend fun syncAllTwoPhase(
+        fastBatchSize: Int = 1,
+        onEvent: (TwoPhaseRefreshEvent) -> Unit
+    ): Result<TwoPhaseRefreshSummary> = withContext(Dispatchers.IO) {
+        try {
+            val sources = sourceDao.getAllSources().first()
+            val summary = runTwoPhaseRefresh(
+                sources = sources,
+                fastBatchSize = fastBatchSize,
+                fetcher = { source -> fetchAndSave(source) },
+                onEvent = onEvent
+            )
+            Result.Success(summary)
         } catch (e: Exception) {
             when (e) {
                 is java.net.UnknownHostException -> {

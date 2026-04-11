@@ -44,6 +44,7 @@ import com.lengyuefenghua.newsreader.R
 import com.lengyuefenghua.newsreader.ui.components.ArticleCard
 import com.lengyuefenghua.newsreader.ui.common.FilterType
 import com.lengyuefenghua.newsreader.ui.common.UiEvent
+import com.lengyuefenghua.newsreader.ui.screens.ArticleReadingItem
 import com.lengyuefenghua.newsreader.viewmodel.TimelineViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -52,7 +53,7 @@ fun TimelineScreen(
     viewModel: TimelineViewModel = viewModel(),
     title: String = "时间线",
     onBack: (() -> Unit)? = null,
-    onArticleClick: (String) -> Unit
+    onArticleClick: (String, List<ArticleReadingItem>) -> Unit
 ) {
     val articles by viewModel.articles.collectAsState()
     val sourceIcons by viewModel.sourceIcons.collectAsState() // [新增]
@@ -191,7 +192,17 @@ fun TimelineScreen(
                             ArticleCard(
                                 article = article,
                                 sourceIconUrl = sourceIcons[article.sourceName], // [新增]
-                                onClick = { onArticleClick(article.url) }
+                                onClick = {
+                                    onArticleClick(
+                                        article.url,
+                                        articles.map {
+                                            ArticleReadingItem(
+                                                url = it.url,
+                                                title = it.title,
+                                            )
+                                        }
+                                    )
+                                }
                             )
                         }
                     }

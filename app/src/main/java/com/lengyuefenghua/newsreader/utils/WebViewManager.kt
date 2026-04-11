@@ -4,7 +4,6 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.os.Handler
 import android.os.Looper
-import android.util.Log
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
@@ -27,6 +26,7 @@ import kotlin.coroutines.resume
 object WebViewManager {
 
     private var backgroundWebView: WebView? = null
+    private var enginePrewarmed = false
 
     // 互斥锁：确保同一时间只有一个任务在使用这个全局 WebView
     private val mutex = Mutex()
@@ -50,10 +50,13 @@ object WebViewManager {
                         // 关键：即使不可见，也要强行设置布局参数，否则某些网页 JS 不会执行
                         layout(0, 0, 1080, 1920)
                     }
-                    Log.d("WebViewManager", "全局后台 WebView 初始化成功")
+                }
+
+                if (!enginePrewarmed) {
+                    prewarmEngine(backgroundWebView)
+                    enginePrewarmed = true
                 }
             } catch (e: Exception) {
-                Log.e("WebViewManager", "WebView 初始化失败: ${e.message}")
             }
         }
     }
@@ -124,7 +127,6 @@ object WebViewManager {
                                     )
 
                             val delay = if (isWaf) {
-                                Log.d("WebViewManager", "检测到疑似 WAF 验证页 (复杂计算型)，延长等待至 25 秒...")
                                 25000L
                             } else {
                                 2000L
@@ -154,14 +156,12 @@ object WebViewManager {
                         error: WebResourceError?
                     ) {
                         if (request?.isForMainFrame == true) {
-                            Log.e("WebViewManager", "加载出错: ${error?.description}")
                             // 这里不立即 resume error，因为有些网站 404 也会触发 error 但内容是有的
                             // 我们选择等待 onPageFinished 或超时
                         }
                     }
                 }
 
-                Log.d("WebViewManager", "开始抓取: $url")
                 webView.loadUrl(url)
             }
         }
@@ -169,5 +169,21 @@ object WebViewManager {
     private suspend fun cleanup() = withContext(Dispatchers.Main) {
         // 加载空页面，停止之前的 JS 执行，为下一次任务做清理
         backgroundWebView?.loadUrl("about:blank")
+    }
+
+    private fun prewarmEngine(webView: WebView?) {
+        webView ?: return
+
+        try {
+            webView.loadDataWithBaseURL(
+                "https://localhost/",
+                "<html><body>prewarm</body></html>",
+                "text/html",
+                "utf-8",
+                null
+            )
+            webView.evaluateJavascript("(function(){return 'prewarm';})();", null)
+        } catch (e: Exception) {
+        }
     }
 }

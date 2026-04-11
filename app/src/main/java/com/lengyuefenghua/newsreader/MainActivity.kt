@@ -18,8 +18,10 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import org.koin.androidx.compose.koinViewModel
@@ -32,6 +34,8 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.lengyuefenghua.newsreader.core.navigation.NavRoutes
 import com.lengyuefenghua.newsreader.ui.screens.ArticleScreen
+import com.lengyuefenghua.newsreader.ui.screens.ArticleReadingContext
+import com.lengyuefenghua.newsreader.ui.screens.ArticleReadingSession
 import com.lengyuefenghua.newsreader.ui.screens.DebugConsoleScreen
 import com.lengyuefenghua.newsreader.ui.screens.EditSourceScreen
 import com.lengyuefenghua.newsreader.ui.screens.FavoritesScreen
@@ -118,7 +122,13 @@ fun NewsReaderApp() {
                 TimelineScreen(
                     viewModel = timelineViewModel,
                     title = "时间线",
-                    onArticleClick = { url ->
+                    onArticleClick = { url, articles ->
+                        ArticleReadingSession.open(
+                            ArticleReadingContext(
+                                articles = articles,
+                                currentUrl = url,
+                            )
+                        )
                         navController.navigate(NavRoutes.article(url))
                     }
                 )
@@ -148,7 +158,13 @@ fun NewsReaderApp() {
             composable(NavRoutes.FAVORITES) {
                 FavoritesScreen(
                     onBack = { navController.popBackStack() },
-                    onArticleClick = { url ->
+                    onArticleClick = { url, articles ->
+                        ArticleReadingSession.open(
+                            ArticleReadingContext(
+                                articles = articles,
+                                currentUrl = url,
+                            )
+                        )
                         navController.navigate(NavRoutes.article(url))
                     }
                 )
@@ -171,7 +187,13 @@ fun NewsReaderApp() {
                     viewModel = timelineViewModel,
                     title = currentSourceTitle ?: "加载中...",
                     onBack = { navController.popBackStack() },
-                    onArticleClick = { url ->
+                    onArticleClick = { url, articles ->
+                        ArticleReadingSession.open(
+                            ArticleReadingContext(
+                                articles = articles,
+                                currentUrl = url,
+                            )
+                        )
                         navController.navigate(NavRoutes.article(url))
                     }
                 )
@@ -185,11 +207,39 @@ fun NewsReaderApp() {
                 arguments = listOf(navArgument(NavRoutes.ARTICLE_ARG) { type = NavType.StringType })
             ) { backStackEntry ->
                 val url = backStackEntry.arguments?.getString(NavRoutes.ARTICLE_ARG) ?: ""
+                var isInternalArticleNavigation by remember(url) { mutableStateOf(false) }
+                val readingContext = ArticleReadingSession.current
+                    ?.takeIf { it.articleUrls.contains(url) }
+                    ?.copy(currentUrl = url)
+                DisposableEffect(url, readingContext?.currentUrl, readingContext?.previousUrl, readingContext?.nextUrl) {
+                    android.util.Log.d(
+                        "ArticlePullDebug",
+                        "route url=$url sessionCurrent=${ArticleReadingSession.current?.currentUrl} prev=${readingContext?.previousUrl} next=${readingContext?.nextUrl}"
+                    )
+                    onDispose {
+                        android.util.Log.d(
+                            "ArticlePullDebug",
+                            "dispose url=$url internal=$isInternalArticleNavigation sessionCurrent=${ArticleReadingSession.current?.currentUrl}"
+                        )
+                    }
+                }
+                DisposableEffect(url) {
+                    onDispose {
+                        if (!isInternalArticleNavigation) {
+                            android.util.Log.d("ArticlePullDebug", "clear session on dispose url=$url")
+                            ArticleReadingSession.clear()
+                        }
+                    }
+                }
                 val initialArticle = remember { timelineViewModel.getArticleByUrl(url) }
                 val article by timelineViewModel.getArticleFlow(url)
                     .collectAsState(initial = initialArticle)
                 ArticleScreen(
                     article = article,
+                    previousTitle = readingContext?.previousTitle,
+                    nextTitle = readingContext?.nextTitle,
+                    previousUrl = readingContext?.previousUrl,
+                    nextUrl = readingContext?.nextUrl,
                     onBack = { navController.popBackStack() },
                     onMarkRead = { article?.let { timelineViewModel.markAsRead(it.id) } },
                     onToggleFavorite = { article?.let { timelineViewModel.toggleFavorite(it) } },
@@ -203,6 +253,21 @@ fun NewsReaderApp() {
                     // [新增] 计时回调
                     onUpdateReadDuration = { id, duration ->
                         timelineViewModel.updateReadDuration(id, duration)
+                    },
+                    onOpenAdjacentArticle = { targetUrl ->
+                        android.util.Log.d(
+                            "ArticlePullDebug",
+                            "onOpenAdjacentArticle current=$url target=$targetUrl sessionBefore=${ArticleReadingSession.current?.currentUrl}"
+                        )
+                        isInternalArticleNavigation = true
+                        ArticleReadingSession.moveTo(targetUrl)
+                        android.util.Log.d(
+                            "ArticlePullDebug",
+                            "sessionAfterMove=${ArticleReadingSession.current?.currentUrl} popping current=$url"
+                        )
+                        navController.popBackStack()
+                        android.util.Log.d("ArticlePullDebug", "navigating target=$targetUrl")
+                        navController.navigate(NavRoutes.article(targetUrl))
                     }
                 )
             }

@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.lengyuefenghua.newsreader.R
 import com.lengyuefenghua.newsreader.ui.components.ArticleCard
+import com.lengyuefenghua.newsreader.ui.screens.ArticleReadingItem
 import com.lengyuefenghua.newsreader.viewmodel.FavoritesViewModel
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
@@ -51,7 +52,7 @@ import com.lengyuefenghua.newsreader.viewmodel.FavoritesViewModel
 fun FavoritesScreen(
     viewModel: FavoritesViewModel = viewModel(),
     onBack: () -> Unit,
-    onArticleClick: (String) -> Unit
+    onArticleClick: (String, List<ArticleReadingItem>) -> Unit
 ) {
     val articles by viewModel.favoriteArticles.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
@@ -160,7 +161,15 @@ fun FavoritesScreen(
                                             article.id
                                         )
                                     } else {
-                                        onArticleClick(article.url)
+                                        onArticleClick(
+                                            article.url,
+                                            articles.map {
+                                                ArticleReadingItem(
+                                                    url = it.url,
+                                                    title = it.title,
+                                                )
+                                            }
+                                        )
                                     }
                                 },
                                 onLongClick = {

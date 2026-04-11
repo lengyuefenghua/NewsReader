@@ -30,6 +30,8 @@
 
     <!-- 无障碍描述 - 功能类 -->
     <string name="desc_toggle_mode">切换显示模式</string>
+    <string name="desc_switch_to_web_mode">切换到网页模式</string>
+    <string name="desc_switch_to_content_mode">切换到内容模式</string>
     <string name="desc_translate">翻译</string>
     <string name="desc_clear_cache">清理缓存</string>
     <string name="desc_open_in_browser">在浏览器中打开</string>

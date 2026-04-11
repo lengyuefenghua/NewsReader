@@ -3,6 +3,7 @@ package com.lengyuefenghua.newsreader.ui.screens
 import android.widget.Toast
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -143,7 +144,6 @@ fun DebugConsoleScreen(
         }
     ) { padding ->
         Column(modifier = Modifier.padding(padding).fillMaxSize()) {
-            // 移除 SelectionContainer，直接使用 Box + Text 配合 combinedClickable
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -155,14 +155,16 @@ fun DebugConsoleScreen(
                                   else if (showRaw) debugResult?.rawSource ?: "无源码数据"
                                   else debugResult?.log ?: "无日志数据"
                                   
-                Text(
-                    text = displayText,
-                    color = Color(0xFF00FF00), // 绿色极客风文字
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 12.sp,
-                    modifier = Modifier
-                        .verticalScroll(scrollState)
-                )
+                SelectionContainer {
+                    Text(
+                        text = displayText,
+                        color = Color(0xFF00FF00), // 绿色极客风文字
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 12.sp,
+                        modifier = Modifier
+                            .verticalScroll(scrollState)
+                    )
+                }
             }
         }
     }
