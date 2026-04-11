@@ -1,3 +1,6 @@
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -17,8 +20,13 @@ android {
         applicationId = "com.lengyuefenghua.newsreader"
         minSdk = 28
         targetSdk = 36
-        versionCode = 5
-        versionName = "0.0.5"
+        versionCode = 6
+        versionName = "1.0"
+        buildConfigField(
+            "String",
+            "BUILD_DATE",
+            "\"${LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)}\""
+        )
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 //        ndk {
@@ -60,8 +68,14 @@ android {
 
     // 自定义 APK 输出文件名
     applicationVariants.all {
+        val variantVersionName = versionName ?: defaultConfig.versionName ?: "1.0"
         outputs.all {
-            (this as com.android.build.gradle.internal.api.BaseVariantOutputImpl).outputFileName = "NewsReader.apk"
+            val apkName = if (buildType.name == "release") {
+                "NewsReaderV${variantVersionName}.apk"
+            } else {
+                "NewsReader.apk"
+            }
+            (this as com.android.build.gradle.internal.api.BaseVariantOutputImpl).outputFileName = apkName
         }
     }
 
@@ -73,6 +87,7 @@ android {
         jvmTarget = "11"
     }
     buildFeatures {
+        buildConfig = true
         compose = true
     }
 }

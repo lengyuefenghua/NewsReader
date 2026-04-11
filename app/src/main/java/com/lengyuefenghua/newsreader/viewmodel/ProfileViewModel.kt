@@ -1,8 +1,6 @@
 package com.lengyuefenghua.newsreader.viewmodel
 
 import android.app.Application
-import android.content.Intent
-import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.lengyuefenghua.newsreader.NewsReaderApplication
@@ -27,12 +25,5 @@ class ProfileViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             dao.deleteAll()
         }
-    }
-
-    // 打开 GitHub 项目主页 (模拟 "关于" 功能)
-    fun openProjectLink() {
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/gedoor/legado"))
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        getApplication<Application>().startActivity(intent)
     }
 }

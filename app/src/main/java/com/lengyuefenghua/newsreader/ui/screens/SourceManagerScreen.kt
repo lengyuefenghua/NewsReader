@@ -90,6 +90,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.lengyuefenghua.newsreader.R
 import com.lengyuefenghua.newsreader.core.navigation.NavRoutes
 import com.lengyuefenghua.newsreader.data.Source
+import com.lengyuefenghua.newsreader.util.buildFeedsBackupFileName
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -278,9 +279,7 @@ fun SourceManagerScreen(
                                     text = { Text("备份到本地") },
                                     onClick = {
                                         showShareMenu = false
-                                        // 生成默认文件名
-                                        val fileName = "NewsReader_Feeds_backup.json"
-                                        filePickerLauncher.launch(fileName)
+                                        filePickerLauncher.launch(buildFeedsBackupFileName())
                                     },
                                     leadingIcon = { Icon(Icons.Default.Save, null) }
                                 )

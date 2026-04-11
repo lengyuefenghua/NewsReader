@@ -56,6 +56,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.lengyuefenghua.newsreader.R
 import com.lengyuefenghua.newsreader.ui.common.FilterType
 import com.lengyuefenghua.newsreader.ui.common.displayName
+import com.lengyuefenghua.newsreader.util.buildDataBackupFileName
 import com.lengyuefenghua.newsreader.util.SettingsManager
 import com.lengyuefenghua.newsreader.viewmodel.SettingsViewModel
 import kotlinx.coroutines.launch
@@ -357,7 +358,7 @@ fun SettingsScreen(
                     Button(
                         onClick = {
                             focusManager.clearFocus()
-                            backupLauncher.launch("NewsReader_${System.currentTimeMillis()}.json")
+                            backupLauncher.launch(buildDataBackupFileName())
                         },
                         modifier = Modifier.weight(1f).height(40.dp)
                     ) {
