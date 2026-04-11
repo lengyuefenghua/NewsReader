@@ -1,12 +1,14 @@
 package com.lengyuefenghua.newsreader.ui.screens
 
 import android.widget.Toast
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -33,13 +35,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.compose.ui.platform.LocalContext
 import com.lengyuefenghua.newsreader.R
 import com.lengyuefenghua.newsreader.ui.components.ArticleCard
 import com.lengyuefenghua.newsreader.ui.common.FilterType
@@ -59,6 +64,7 @@ fun TimelineScreen(
     val sourceIcons by viewModel.sourceIcons.collectAsState() // [新增]
     val syncState by viewModel.syncState.collectAsState() // [新增] 监听同步状态
     val currentFilter by viewModel.filterState.collectAsState()
+    val unreadCount by viewModel.unreadCount.collectAsState()
     val listState = rememberLazyListState() // [新增] 滚动状态控制
     val context = LocalContext.current
     var previousFirstArticleId by remember { mutableStateOf<String?>(null) }
@@ -132,6 +138,7 @@ fun TimelineScreen(
                 actions = {
                     FilterChipGroup(
                         currentFilter = currentFilter,
+                        unreadCount = unreadCount,
                         onFilterSelected = { viewModel.setFilter(it) }
                     )
                 }
@@ -234,9 +241,16 @@ internal fun shouldRevealNewTopArticle(
 @Composable
 fun FilterChipGroup(
     currentFilter: FilterType,
+    unreadCount: Int,
     onFilterSelected: (FilterType) -> Unit
 ) {
     val context = LocalContext.current
+    val unreadBadgeText = if (unreadCount > 99) "99+" else unreadCount.toString()
+    var unreadBadgeSize by remember { mutableStateOf(IntSize.Zero) }
+
+    // 手动微调角标位置时只改这两个值。
+    val badgeNudgeX = 0.dp
+    val badgeNudgeY = 10.dp
 
     // Pre-load content description strings
     val descFilterAll = context.getString(R.string.desc_filter_all)
@@ -252,14 +266,35 @@ fun FilterChipGroup(
                 .padding(end = 8.dp)
                 .semantics { contentDescription = descFilterAll }
         )
-        FilterChip(
-            selected = currentFilter == FilterType.UNREAD,
-            onClick = { onFilterSelected(FilterType.UNREAD) },
-            label = { Text("未读") },
-            modifier = Modifier
-                .padding(end = 8.dp)
-                .semantics { contentDescription = descFilterUnread }
-        )
+        Box(modifier = Modifier.padding(end = if (unreadCount > 0) 18.dp else 8.dp)) {
+            FilterChip(
+                selected = currentFilter == FilterType.UNREAD,
+                onClick = { onFilterSelected(FilterType.UNREAD) },
+                label = { Text("未读") },
+                modifier = Modifier.semantics { contentDescription = descFilterUnread }
+            )
+            if (unreadCount > 0) {
+                Text(
+                    text = unreadBadgeText,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onError,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .onSizeChanged { unreadBadgeSize = it }
+                        .offset {
+                            IntOffset(
+                                x = unreadBadgeSize.width / 2 + badgeNudgeX.roundToPx(),
+                                y = -unreadBadgeSize.height / 2 + badgeNudgeY.roundToPx()
+                            )
+                        }
+                        .background(
+                            color = MaterialTheme.colorScheme.error,
+                            shape = RoundedCornerShape(999.dp)
+                        )
+                        .padding(horizontal = 6.dp, vertical = 1.dp)
+                )
+            }
+        }
         FilterChip(
             selected = currentFilter == FilterType.READ,
             onClick = { onFilterSelected(FilterType.READ) },

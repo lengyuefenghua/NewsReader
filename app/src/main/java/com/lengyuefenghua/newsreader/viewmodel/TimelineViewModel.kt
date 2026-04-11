@@ -86,6 +86,21 @@ class TimelineViewModel(
             initialValue = emptyList()
         )
 
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val unreadCount: StateFlow<Int> = _sourceFilter
+        .flatMapLatest { sourceName ->
+            if (sourceName == null) {
+                repository.getUnreadCount()
+            } else {
+                repository.getUnreadCountBySource(sourceName)
+            }
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Lazily,
+            initialValue = 0
+        )
+
     fun fetchArticles() {
         refresh()
     }

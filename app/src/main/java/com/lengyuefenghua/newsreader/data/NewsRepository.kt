@@ -87,6 +87,14 @@ class NewsRepository(
         return articleDao.getArticlesBySourceFlow(sourceName)
     }
 
+    fun getUnreadCount(): Flow<Int> {
+        return articleDao.getUnreadCountFlow()
+    }
+
+    fun getUnreadCountBySource(sourceName: String): Flow<Int> {
+        return articleDao.getUnreadCountBySourceFlow(sourceName)
+    }
+
     // [新增] 获取单篇文章流，修复类型不匹配问题
     fun getArticleFlow(url: String): Flow<Article?> {
         return articleDao.getArticleFlow(url)
