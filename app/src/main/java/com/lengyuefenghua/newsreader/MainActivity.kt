@@ -47,6 +47,7 @@ import com.lengyuefenghua.newsreader.ui.screens.AwesomeRssHubRoutesMarketScreen
 import com.lengyuefenghua.newsreader.ui.screens.PlinkMarketScreen
 import com.lengyuefenghua.newsreader.ui.screens.PlinkFeedPreviewScreen
 import com.lengyuefenghua.newsreader.ui.screens.ProfileScreen
+import com.lengyuefenghua.newsreader.ui.screens.QiReaderMarketScreen
 import com.lengyuefenghua.newsreader.ui.screens.SettingsScreen
 import com.lengyuefenghua.newsreader.ui.screens.SourceManagerScreen
 import com.lengyuefenghua.newsreader.ui.screens.StatsScreen
@@ -171,7 +172,8 @@ fun NewsReaderApp() {
                     onOpenPlink = { navController.navigate(NavRoutes.PLINK_MARKET) },
                     onOpenAwesomeRssHub = { navController.navigate(NavRoutes.AWESOME_RSSHUB_MARKET) },
                     onOpenTopRssList = { navController.navigate(NavRoutes.TOP_RSS_LIST_MARKET) },
-                    onOpenWechat2Rss = { navController.navigate(NavRoutes.WECHAT2RSS_MARKET) }
+                    onOpenWechat2Rss = { navController.navigate(NavRoutes.WECHAT2RSS_MARKET) },
+                    onOpenQiReader = { navController.navigate(NavRoutes.QIREADER_MARKET) }
                 )
             }
 
@@ -211,6 +213,15 @@ fun NewsReaderApp() {
                     onBack = { navController.popBackStack() },
                     onOpenFeedPreview = { name, url ->
                         navController.navigate(NavRoutes.wechat2RssFeedPreview(name, url))
+                    }
+                )
+            }
+
+            composable(NavRoutes.QIREADER_MARKET) {
+                QiReaderMarketScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenFeedPreview = { name, url ->
+                        navController.navigate(NavRoutes.qiReaderFeedPreview(name, url))
                     }
                 )
             }
@@ -379,6 +390,48 @@ fun NewsReaderApp() {
                     onSubscribed = {
                         plinkFeedPreviewViewModel.clearPreview()
                         navController.popBackStack(NavRoutes.WECHAT2RSS_MARKET, false)
+                    }
+                )
+            }
+
+            composable(
+                route = NavRoutes.QIREADER_FEED_PREVIEW,
+                arguments = listOf(
+                    navArgument(NavRoutes.QIREADER_FEED_PREVIEW_NAME_ARG) {
+                        type = NavType.StringType
+                        defaultValue = ""
+                    },
+                    navArgument(NavRoutes.QIREADER_FEED_PREVIEW_URL_ARG) {
+                        type = NavType.StringType
+                    }
+                )
+            ) { backStackEntry ->
+                val title = backStackEntry.arguments?.getString(NavRoutes.QIREADER_FEED_PREVIEW_NAME_ARG).orEmpty()
+                val url = backStackEntry.arguments?.getString(NavRoutes.QIREADER_FEED_PREVIEW_URL_ARG).orEmpty()
+                PlinkFeedPreviewScreen(
+                    title = title,
+                    url = url,
+                    viewModel = plinkFeedPreviewViewModel,
+                    sourceViewModel = sourceViewModel,
+                    onBack = {
+                        plinkFeedPreviewViewModel.clearPreview()
+                        navController.popBackStack()
+                    },
+                    onArticleClick = { articleUrl, articles ->
+                        ArticleReadingSession.open(
+                            ArticleReadingContext(
+                                articles = articles,
+                                currentUrl = articleUrl,
+                            )
+                        )
+                        navController.navigate(NavRoutes.article(articleUrl))
+                    },
+                    onOpenAdvanced = { name, targetUrl ->
+                        navController.navigate(NavRoutes.sourceEdit(name = name, url = targetUrl))
+                    },
+                    onSubscribed = {
+                        plinkFeedPreviewViewModel.clearPreview()
+                        navController.popBackStack(NavRoutes.QIREADER_MARKET, false)
                     }
                 )
             }
@@ -599,6 +652,11 @@ fun NewsReaderApp() {
                                 NavRoutes.WECHAT2RSS_FEED_PREVIEW -> {
                                     plinkFeedPreviewViewModel.clearPreview()
                                     navController.popBackStack(NavRoutes.WECHAT2RSS_MARKET, false)
+                                }
+
+                                NavRoutes.QIREADER_FEED_PREVIEW -> {
+                                    plinkFeedPreviewViewModel.clearPreview()
+                                    navController.popBackStack(NavRoutes.QIREADER_MARKET, false)
                                 }
 
                                 else -> {

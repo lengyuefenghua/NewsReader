@@ -75,6 +75,7 @@ class NewsRepository(
         const val TOP_RSS_LIST_URL = "https://github.com/weekend-project-space/top-rss-list/blob/main/README.md"
         const val TOP_RSS_LIST_RAW_URL = "https://raw.githubusercontent.com/weekend-project-space/top-rss-list/main/README.md"
         const val WECHAT2RSS_URL = "https://wechat2rss.xlab.app/list/all.html"
+        const val QIREADER_DISCOVER_URL = "https://www.qireader.com.cn/discover?lastUpdateDays=7&language=zh"
         const val UA_ANDROID =
             "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
         const val UA_PC =

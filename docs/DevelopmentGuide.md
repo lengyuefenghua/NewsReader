@@ -135,7 +135,7 @@ Compose UI
 如果任务提到：
 - 时间线、未读/已读筛选、刷新、进度条：从 `TimelineViewModel.kt` 开始
 - 订阅源列表、导入、导出、重复订阅源、编辑订阅源：从 `SourceViewModel.kt` 开始
-- 发现页、订阅市场插件、目录型 RSS 源接入：先看 `docs/DiscoverSourceGuide.md`，再看 `DiscoverViewModel.kt`
+- 发现页、订阅市场插件、目录型 RSS 源接入：先看 `docs/DiscoverSourceGuide.md`；直连解析模式再看 `DiscoverViewModel.kt`，WebView 借壳模式先看对应 `XxxMarketScreen.kt`（如 `QiReaderMarketScreen.kt`）
 - 文章页、WebView、提取、可读性、内容模式：从 `ArticleScreen.kt` 开始
 - 备份、恢复、自动更新、缓存、默认筛选：从 `SettingsViewModel.kt` 开始
 - 收藏或阅读统计：从 `ArticleDao.kt` 开始，再看对应 ViewModel
@@ -380,7 +380,7 @@ SettingsScreen
 在你需要快速建立全局认知时，优先读这些文件：
 
 - `docs/README.md`：产品功能层面的总览
-- `docs/DiscoverSourceGuide.md`：发现源与订阅市场接入手册
+- `docs/DiscoverSourceGuide.md`：发现源与订阅市场接入手册，包含直连解析模式与 WebView 借壳模式
 - `AGENTS.md`：仓库工作流与安全规则
 - `app/src/main/java/com/lengyuefenghua/newsreader/NewsReaderApplication.kt`：启动入口
 - `app/src/main/java/com/lengyuefenghua/newsreader/MainActivity.kt`：应用外壳与导航

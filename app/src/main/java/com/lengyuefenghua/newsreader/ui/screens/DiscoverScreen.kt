@@ -33,7 +33,8 @@ fun DiscoverScreen(
     onOpenPlink: () -> Unit,
     onOpenAwesomeRssHub: () -> Unit,
     onOpenTopRssList: () -> Unit,
-    onOpenWechat2Rss: () -> Unit
+    onOpenWechat2Rss: () -> Unit,
+    onOpenQiReader: () -> Unit
 ) {
     val plugins = listOf(
         DiscoverPlugin(
@@ -59,6 +60,12 @@ fun DiscoverScreen(
             subtitle = NewsRepository.WECHAT2RSS_URL,
             description = "浏览 Wechat2RSS 整理的公开公众号 RSS 列表",
             onClick = onOpenWechat2Rss
+        ),
+        DiscoverPlugin(
+            title = "QiReader",
+            subtitle = NewsRepository.QIREADER_DISCOVER_URL,
+            description = "登录后在 QiReader 的标签和搜索页里发现订阅源，并进入预览后订阅",
+            onClick = onOpenQiReader
         )
     )
 

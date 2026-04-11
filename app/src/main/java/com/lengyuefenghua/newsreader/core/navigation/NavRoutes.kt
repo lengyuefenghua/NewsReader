@@ -25,6 +25,10 @@ object NavRoutes {
     const val WECHAT2RSS_FEED_PREVIEW = "wechat2rss_feed_preview?name={name}&url={url}"
     const val WECHAT2RSS_FEED_PREVIEW_NAME_ARG = "name"
     const val WECHAT2RSS_FEED_PREVIEW_URL_ARG = "url"
+    const val QIREADER_MARKET = "qireader_market"
+    const val QIREADER_FEED_PREVIEW = "qireader_feed_preview?name={name}&url={url}"
+    const val QIREADER_FEED_PREVIEW_NAME_ARG = "name"
+    const val QIREADER_FEED_PREVIEW_URL_ARG = "url"
 
     const val ARTICLE = "article/{url}"
     const val ARTICLE_ARG = "url"
@@ -70,6 +74,12 @@ object NavRoutes {
         val encodedName = URLEncoder.encode(name, StandardCharsets.UTF_8.toString())
         val encodedUrl = URLEncoder.encode(url, StandardCharsets.UTF_8.toString())
         return "wechat2rss_feed_preview?name=$encodedName&url=$encodedUrl"
+    }
+
+    fun qiReaderFeedPreview(name: String, url: String): String {
+        val encodedName = URLEncoder.encode(name, StandardCharsets.UTF_8.toString())
+        val encodedUrl = URLEncoder.encode(url, StandardCharsets.UTF_8.toString())
+        return "qireader_feed_preview?name=$encodedName&url=$encodedUrl"
     }
 
     fun sourceEdit(id: Int = -1, name: String = "", url: String = ""): String {
