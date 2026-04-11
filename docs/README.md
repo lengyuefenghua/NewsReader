@@ -4,14 +4,17 @@
 
 ## 核心特性
 
-- **时间线阅读**：聚合所有订阅源文章，支持全部/未读/已读筛选，并可配置默认筛选项
-- **RSS 订阅**：支持 RSS/Atom 订阅源管理
+- **时间线阅读**：聚合所有订阅源文章，支持全部/未读/已读筛选，未读筛选带数量角标，并可配置默认筛选项
+- **RSS 订阅**：支持手动添加、编辑、导入导出、重复项覆盖更新
+- **发现订阅源**：内置 Plink、Awesome RSSHub Routes、Top RSS List、Wechat2RSS 和 QiReader 等订阅市场入口
+- **订阅预览**：支持在保存前预览文章样例，再直接订阅或跳转到高级编辑
 - **自定义解析**：支持配置 CSS 选择器规则，以适配任意网页
 - **动态网页支持**：可通过 WebView 抓取动态页面，适配部分反爬站点
 - **文章收藏**：收藏感兴趣的文章，便于后续阅读
 - **阅读统计**：记录阅读时长、阅读量和趋势数据
 - **智能刷新**：采用增量刷新策略，并展示每个订阅源的刷新进度与新增文章数
 - **数据备份**：可完整备份订阅源、文章和设置，并支持恢复
+- **发布信息展示**：关于页可查看版本号、构建日期、作者和 GitHub 链接
 - **离线阅读**：依赖本地数据库存储，支持离线浏览
 
 ## 技术栈
@@ -31,6 +34,9 @@
 app/src/main/java/com/lengyuefenghua/newsreader/
 ├── MainActivity.kt                    # 主入口
 ├── NewsReaderApplication.kt           # Application 入口
+├── core/
+│   ├── di/                            # Koin 模块
+│   └── navigation/                    # 路由定义
 ├── data/
 │   ├── AppDatabase.kt                 # Room 数据库
 │   ├── Article.kt                     # 文章实体
@@ -45,28 +51,38 @@ app/src/main/java/com/lengyuefenghua/newsreader/
 │   ├── screens/
 │   │   ├── TimelineScreen.kt          # 时间线页面
 │   │   ├── SourceManagerScreen.kt     # 订阅源管理页面
+│   │   ├── DiscoverScreen.kt          # 发现页入口
+│   │   ├── FeedPreviewScreen.kt       # 通用订阅预览页
+│   │   ├── PlinkMarketScreen.kt       # 目录型发现源市场页
+│   │   ├── PlinkFeedPreviewScreen.kt  # 发现源预览页
+│   │   ├── QiReaderMarketScreen.kt    # WebView 发现源市场页
 │   │   ├── ArticleScreen.kt           # 文章详情页面
 │   │   ├── EditSourceScreen.kt        # 编辑订阅源页面
 │   │   ├── FavoritesScreen.kt         # 收藏页面
+│   │   ├── ProfileScreen.kt           # 个人中心与关于页面
 │   │   ├── SettingsScreen.kt          # 设置页面
 │   │   ├── StatsScreen.kt             # 统计页面
-│   │   ├── ProfileScreen.kt           # 个人中心页面
 │   │   └── DebugConsoleScreen.kt      # 调试控制台页面
-│   └── navigation/                    # 导航配置
+├── util/
+│   ├── BackupFileNameUtils.kt         # 备份文件名规范
+│   └── SettingsManager.kt             # 本地设置管理
+├── utils/
+│   ├── RssParser.kt                   # RSS 解析器
+│   ├── HtmlParser.kt                  # HTML 解析器
+│   ├── AutoExtractor.kt               # 自动内容提取器
+│   ├── WebViewManager.kt              # WebView 管理
+│   └── DebugHelper.kt                 # 调试辅助工具
 ├── viewmodel/
 │   ├── TimelineViewModel.kt           # 时间线 ViewModel
 │   ├── SourceViewModel.kt             # 订阅源 ViewModel
+│   ├── DiscoverViewModel.kt           # 发现源 ViewModel
+│   ├── FeedPreviewViewModel.kt        # 通用预览 ViewModel
+│   ├── PlinkFeedPreviewViewModel.kt   # 发现源预览 ViewModel
 │   ├── EditSourceViewModel.kt         # 编辑订阅源 ViewModel
 │   ├── FavoritesViewModel.kt          # 收藏 ViewModel
 │   ├── SettingsViewModel.kt           # 设置 ViewModel
 │   ├── StatsViewModel.kt              # 统计 ViewModel
 │   └── ProfileViewModel.kt            # 个人中心 ViewModel
-└── utils/
-    ├── RssParser.kt                   # RSS 解析器
-    ├── HtmlParser.kt                  # HTML 解析器
-    ├── AutoExtractor.kt               # 自动内容提取器
-    ├── WebViewManager.kt              # WebView 管理
-    └── DebugHelper.kt                 # 调试辅助工具
 ```
 
 ## 快速开始
@@ -97,7 +113,15 @@ cd NewsReader
 
 4. 连接 Android 设备或启动模拟器
 
-5. 安装应用
+5. 一键安装并启动应用（推荐）
+
+```bash
+./run-debug.sh
+```
+
+说明：需要确保 `adb` 在 `PATH` 中。脚本会执行 `installDebug -> am force-stop -> monkey` 来完成安装和启动。
+
+如只需安装 APK，可执行：
 
 ```bash
 ./gradlew installDebug
@@ -110,6 +134,13 @@ cd NewsReader
 1. 进入“订阅”页面
 2. 点击“添加订阅”按钮
 3. 输入 RSS 源 URL，或配置自定义抓取规则
+
+### 发现并预览订阅源
+
+1. 进入“发现”页面
+2. 选择目录型市场或 QiReader WebView 市场
+3. 打开预览页查看文章样例
+4. 直接保存订阅，或跳到“高级编辑”补充配置
 
 ### 自定义解析规则
 
@@ -148,4 +179,4 @@ cd NewsReader
 ## 联系方式
 
 - 作者：lengyuefenghua
-- 项目链接：[GitHub Repository]
+- 项目链接：https://github.com/lengyuefenghua/NewsReader

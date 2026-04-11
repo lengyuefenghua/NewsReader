@@ -2,6 +2,44 @@
 
 本文件记录 NewsReader 项目的所有重要修改。
 
+### 2026-04-11 发现订阅流、管理入口与发布信息完善
+
+**修改原因：**
+1. 用户希望从“发现”页和“订阅”页都能先预览文章样例，再决定是否保存订阅源。
+2. 用户需要更直接的界面反馈，快速判断未读数量和订阅管理相关操作入口。
+3. 发布前需要在应用内展示版本信息，并统一导出文件和 APK 的命名规则，降低分享和备份时的混乱。
+
+**修改内容：**
+- **发现页与订阅预览扩展**：
+  - 新增 `Plink`、`Awesome RSSHub Routes`、`Top RSS List`、`Wechat2RSS` 和 `QiReader` 等发现入口
+  - 新增通用 `FeedPreviewScreen`，支持从“订阅”页预览文章样例后直接保存或进入高级编辑
+  - `QiReader` 采用 WebView 借壳发现模式，支持登录后在网页内拦截“订阅”动作并跳转到应用内预览页
+- **订阅管理与时间线反馈优化**：
+  - 调整“订阅”页组织方式，让导入导出、预览和编辑流转更集中
+  - 为时间线“未读”筛选增加数量角标，减少来回切换确认成本
+- **发布信息与导出命名统一**：
+  - “关于”弹窗展示版本号、构建日期、作者和 GitHub 链接
+  - 订阅源导出和完整数据备份文件名统一为 `NewsReader_Feeds_Backup_YYYYMMDD.json` 与 `NewsReader_Data_Backup_YYYYMMDD.json`
+  - release APK 输出名统一为 `NewsReaderV<version>.apk`
+
+**技术细节：**
+- `DiscoverScreen.kt` / `PlinkMarketScreen.kt` / `QiReaderMarketScreen.kt`：扩展发现页入口与市场导航
+- `FeedPreviewScreen.kt` / `FeedPreviewViewModel.kt` / `PlinkFeedPreviewScreen.kt`：实现订阅预览、直接保存和高级编辑流转
+- `TimelineScreen.kt`：为“未读”筛选增加角标显示
+- `ProfileScreen.kt` / `app/build.gradle.kts`：展示版本与构建日期，并通过 `BuildConfig` 注入发布信息
+- `BackupFileNameUtils.kt` / `SourceManagerScreen.kt` / `SettingsScreen.kt`：统一导出文件名
+
+**相关提交：**
+- `4121f91`: feat: add feed preview subscription flow
+- `a20d577`: feat: add Plink discovery flow
+- `07c5fec`: feat: expand discover feed catalogs
+- `bc6ecfa`: feat: add QiReader WebView discovery flow
+- `7caef9c`: feat: show unread badge on timeline filter
+- `3c2eaa1`: feat: improve source manager organization
+- `cd6b058`: feat: surface release info and standardize exports
+
+---
+
 ### 2026-04-04 设置页滑条交互优化
 
 **修改原因：**

@@ -21,8 +21,8 @@
 - 这是单模块 Android 工程，只包含 `:app`。
 - 技术栈主线：Compose + ViewModel + Repository + Room/network，依赖注入使用 Koin。
 - Room 使用 KSP，不是 kapt：见 `app/build.gradle.kts`。
-- 数据库版本是 `10`，且启用了 `fallbackToDestructiveMigration()`：见 `AppDatabase.kt`。任何 schema 变更都要明确说明数据清空风险。
-- `debug` 和 `release` 都使用 debug keystore；`release` 开启 R8 和资源压缩；APK 输出名固定为 `NewsReader.apk`。
+- 数据库版本是 `11`，且启用了 `fallbackToDestructiveMigration()`：见 `AppDatabase.kt`。任何 schema 变更都要明确说明数据清空风险。
+- `debug` 和 `release` 都使用 debug keystore；`release` 开启 R8 和资源压缩；`debug` APK 输出名固定为 `NewsReader.apk`，`release` APK 输出名为 `NewsReaderV<version>.apk`。
 - lint 被配置为 `abortOnError = false` 且 `checkReleaseBuilds = false`；lint 通过不能当作正确性证明。
 
 ## 验证与命令

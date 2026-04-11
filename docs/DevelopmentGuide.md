@@ -22,13 +22,13 @@
 如果你对仓库完全没有上下文，按以下顺序阅读：
 
 1. `AGENTS.md`
-3. `docs/README.md`
-4. `app/src/main/java/com/lengyuefenghua/newsreader/NewsReaderApplication.kt`
-5. `app/src/main/java/com/lengyuefenghua/newsreader/MainActivity.kt`
-6. `app/src/main/java/com/lengyuefenghua/newsreader/viewmodel/TimelineViewModel.kt`
-7. `app/src/main/java/com/lengyuefenghua/newsreader/data/NewsRepository.kt`
-8. `app/src/main/java/com/lengyuefenghua/newsreader/data/AppDatabase.kt`
-9. 本文后面列出的功能相关文件
+2. `docs/README.md`
+3. `app/src/main/java/com/lengyuefenghua/newsreader/NewsReaderApplication.kt`
+4. `app/src/main/java/com/lengyuefenghua/newsreader/MainActivity.kt`
+5. `app/src/main/java/com/lengyuefenghua/newsreader/viewmodel/TimelineViewModel.kt`
+6. `app/src/main/java/com/lengyuefenghua/newsreader/data/NewsRepository.kt`
+7. `app/src/main/java/com/lengyuefenghua/newsreader/data/AppDatabase.kt`
+8. 本文后面列出的功能相关文件
 
 如果任务描述不清楚，不要猜。先从下文的任务入口定位功能区，再只阅读该功能相关的文件。
 
@@ -136,8 +136,10 @@ Compose UI
 - 时间线、未读/已读筛选、刷新、进度条：从 `TimelineViewModel.kt` 开始
 - 订阅源列表、导入、导出、重复订阅源、编辑订阅源：从 `SourceViewModel.kt` 开始
 - 发现页、订阅市场插件、目录型 RSS 源接入：先看 `docs/DiscoverSourceGuide.md`；直连解析模式再看 `DiscoverViewModel.kt`，WebView 借壳模式先看对应 `XxxMarketScreen.kt`（如 `QiReaderMarketScreen.kt`）
+- 订阅源预览、从预览页直接保存、从预览页跳高级编辑：先看 `FeedPreviewScreen.kt`；发现市场预览再看 `PlinkFeedPreviewScreen.kt`
 - 文章页、WebView、提取、可读性、内容模式：从 `ArticleScreen.kt` 开始
 - 备份、恢复、自动更新、缓存、默认筛选：从 `SettingsViewModel.kt` 开始
+- 个人中心、关于、版本号/构建日期、开源致敬：从 `ProfileScreen.kt` 开始
 - 收藏或阅读统计：从 `ArticleDao.kt` 开始，再看对应 ViewModel
 
 如果拿不准，先定位负责该功能的 ViewModel，再沿着调用链往下追到 repository、DAO 和工具类。
@@ -231,7 +233,12 @@ SettingsScreen
 - 以 JSON 导入导出订阅源定义
 - 导入时支持重复项处理策略
 
-### 3. 文章详情阅读
+### 3. 发现与订阅预览
+- 提供目录型与 WebView 型发现市场入口
+- 支持从发现页和“订阅”页预览文章样例
+- 预览后可直接保存订阅，或进入高级编辑
+
+### 4. 文章详情阅读
 - 在 WebView 中打开原文页面
 - 在页面模式与正文模式间切换
 - 标记文章为已读
@@ -239,28 +246,33 @@ SettingsScreen
 - 记录阅读时长
 - 支持浏览器打开、分享链接、复制链接、打开源设置
 
-### 4. 自定义提取
+### 5. 自定义提取
 - 支持 RSS 与自定义 HTML 源
 - 支持基于选择器的内容提取
 - 支持通过注入 JS 算法自动提取可读正文
 
-### 5. 收藏
+### 6. 收藏
 - 仅展示已收藏文章
 - 按标题或摘要搜索收藏
 - 批量移除收藏
 
-### 6. 统计
+### 7. 统计
 - 记录已读数量与阅读时长
 - 展示今日、本周、本月、全年与总计统计
 - 展示最近每日趋势
 - 展示按订阅源聚合的阅读统计
 
-### 7. 设置与维护
+### 8. 设置与维护
 - 自动更新开关
 - 刷新并发设置
 - 默认时间线筛选设置
 - 缓存保留与清理设置
 - 数据与设置的完整备份/恢复
+
+### 9. 个人中心与关于
+- 聚合收藏、统计、设置等维护入口
+- 展示版本号、构建日期、作者和 GitHub 链接
+- 提供开源致敬与调试入口
 
 ## 面向 AI 开发的工作规则
 
@@ -324,6 +336,30 @@ SettingsScreen
 - `SourceDao.kt`：订阅源持久化与查询
 - `ArticleDao.kt`：与订阅源相关的批量文章更新与清理
 
+### 发现源与预览订阅
+
+主要文件：
+- `app/src/main/java/com/lengyuefenghua/newsreader/ui/screens/DiscoverScreen.kt`
+- `app/src/main/java/com/lengyuefenghua/newsreader/ui/screens/PlinkMarketScreen.kt`
+- `app/src/main/java/com/lengyuefenghua/newsreader/ui/screens/QiReaderMarketScreen.kt`
+- `app/src/main/java/com/lengyuefenghua/newsreader/ui/screens/FeedPreviewScreen.kt`
+- `app/src/main/java/com/lengyuefenghua/newsreader/ui/screens/PlinkFeedPreviewScreen.kt`
+- `app/src/main/java/com/lengyuefenghua/newsreader/viewmodel/DiscoverViewModel.kt`
+- `app/src/main/java/com/lengyuefenghua/newsreader/viewmodel/FeedPreviewViewModel.kt`
+- `app/src/main/java/com/lengyuefenghua/newsreader/viewmodel/PlinkFeedPreviewViewModel.kt`
+- `app/src/main/java/com/lengyuefenghua/newsreader/core/navigation/NavRoutes.kt`
+
+职责拆分：
+- `DiscoverScreen.kt`：发现页卡片入口与市场说明
+- `PlinkMarketScreen.kt`：目录型发现源市场页与预览页跳转
+- `QiReaderMarketScreen.kt`：WebView 借壳发现页、登录态保持与网页内订阅拦截
+- `FeedPreviewScreen.kt`：订阅页内通用预览流，支持直接保存或跳高级编辑
+- `PlinkFeedPreviewScreen.kt`：发现市场预览页，承接目录型和 WebView 市场的订阅确认
+- `DiscoverViewModel.kt`：目录型市场加载状态与刷新入口
+- `FeedPreviewViewModel.kt`：订阅页内预览会话和返回路由
+- `PlinkFeedPreviewViewModel.kt`：发现市场预览数据加载与清理
+- `NavRoutes.kt`：发现页、市场页、预览页和编辑返回链路的路由定义
+
 ### 文章详情与正文提取
 
 主要文件：
@@ -351,6 +387,7 @@ SettingsScreen
 - `app/src/main/java/com/lengyuefenghua/newsreader/data/UserPreferencesRepository.kt`
 - `app/src/main/java/com/lengyuefenghua/newsreader/util/SettingsManager.kt`
 - `app/src/main/java/com/lengyuefenghua/newsreader/data/BackupData.kt`
+- `app/src/main/java/com/lengyuefenghua/newsreader/util/BackupFileNameUtils.kt`
 
 职责拆分：
 - `SettingsScreen.kt`：设置 UI 与文件选择器集成
@@ -358,6 +395,19 @@ SettingsScreen
 - `UserPreferencesRepository.kt`：DataStore 持久化设置，如自动更新和缓存上限
 - `SettingsManager.kt`：SharedPreferences 持久化设置，如筛选类型和刷新并发
 - `BackupData.kt`：备份载荷模型
+- `BackupFileNameUtils.kt`：统一订阅源导出和完整数据备份的文件名格式
+
+### 个人中心、关于与调试
+
+主要文件：
+- `app/src/main/java/com/lengyuefenghua/newsreader/ui/screens/ProfileScreen.kt`
+- `app/src/main/java/com/lengyuefenghua/newsreader/ui/screens/DebugConsoleScreen.kt`
+- `app/build.gradle.kts`
+
+职责拆分：
+- `ProfileScreen.kt`：个人中心入口、关于弹窗、开源致敬与功能导航
+- `DebugConsoleScreen.kt`：调试信息查看与复制
+- `app/build.gradle.kts`：注入 `BUILD_DATE`，并定义 debug/release APK 输出命名
 
 ### 收藏与统计
 
@@ -389,6 +439,7 @@ SettingsScreen
 - `app/src/main/java/com/lengyuefenghua/newsreader/data/AppDatabase.kt`：Room 数据库与迁移行为
 - `app/src/main/java/com/lengyuefenghua/newsreader/viewmodel/SettingsViewModel.kt`：备份与设置维护
 - `app/src/main/java/com/lengyuefenghua/newsreader/ui/screens/ArticleScreen.kt`：复杂文章阅读行为
+- `app/src/main/java/com/lengyuefenghua/newsreader/ui/screens/ProfileScreen.kt`：个人中心、关于和发布信息展示
 
 ## 面向任务的入口点
 
@@ -434,10 +485,27 @@ SettingsScreen
 
 同时查看：
 - `ArticleDao.kt`
+- `FeedPreviewScreen.kt`
+- `FeedPreviewViewModel.kt`
 
 注意：
 - 删除订阅源可能需要同时删除其文章
 - 导入逻辑支持 skip 和 update 两种策略
+- 订阅页内预览保存后通常要回到原入口，而不是发现页市场路由
+
+### 如果你要改发现页、市场页或订阅预览
+阅读：
+- `docs/DiscoverSourceGuide.md`
+- `DiscoverScreen.kt`
+- `MainActivity.kt`
+- `NavRoutes.kt`
+- 对应的 `XxxMarketScreen.kt`
+- `FeedPreviewScreen.kt` 或 `PlinkFeedPreviewScreen.kt`
+- 对应的 `FeedPreviewViewModel.kt` 或 `PlinkFeedPreviewViewModel.kt`
+
+注意：
+- 订阅页内预览和发现市场预览是两条不同的返回链路
+- 从预览页进入高级编辑后，保存时最容易漏掉回退目标
 
 ### 如果你要改文章显示或正文提取
 阅读：
@@ -460,6 +528,7 @@ SettingsScreen
 - `UserPreferencesRepository.kt`
 - `SettingsManager.kt`
 - `BackupData.kt`
+- `BackupFileNameUtils.kt`
 
 注意：
 - 设置故意分布在两套存储系统中
@@ -508,6 +577,7 @@ SettingsScreen
 
 - 刷新规划逻辑：`app/src/test/java/com/lengyuefenghua/newsreader/data/RefreshPlannerTest.kt`
 - 两阶段刷新行为：`app/src/test/java/com/lengyuefenghua/newsreader/data/TwoPhaseRefreshRepositoryTest.kt`
+- 订阅预览状态：`app/src/test/java/com/lengyuefenghua/newsreader/viewmodel/FeedPreviewViewModelTest.kt`
 - Repository 或解析器改动：优先运行有覆盖的定向 JVM 测试
 - Compose 或导航改动：在用户明确要求时考虑 `assembleDebug` 与手动验证
 - 备份恢复与 WebView 提取改动：通常需要手动验证，因为自动化覆盖有限

@@ -93,6 +93,8 @@ DiscoverScreen
   - WebView 借壳模式的市场页样例，负责可见 `WebView`、登录态保持、JavaScript bridge 和网页内订阅按钮拦截。
 - `app/src/main/java/com/lengyuefenghua/newsreader/ui/screens/PlinkFeedPreviewScreen.kt`
   - 订阅预览页。当前两种模式都复用它。
+- `app/src/main/java/com/lengyuefenghua/newsreader/ui/screens/FeedPreviewScreen.kt`
+  - “订阅”页内的通用预览页，不作为发现源接入模板，但可以参考它的保存与高级编辑交互。
 
 ## 接入前先判断模式
 
@@ -269,12 +271,14 @@ fun ExampleMarketScreen(...) {
 
 第 4 点非常容易漏。当前逻辑在 `EditSourceScreen` 的 `onSave` 回退分支里，根据上一层预览路由决定返回哪个市场页。
 
-### 9. 预览页一般复用 `PlinkFeedPreviewScreen`
+### 9. 发现源预览页一般复用 `PlinkFeedPreviewScreen`
 
 只要新发现源输出的是标准 RSS/Atom URL，就通常不需要新建预览页，可以继续复用：
 
 - `PlinkFeedPreviewScreen`
 - `PlinkFeedPreviewViewModel`
+
+仓库里另有 `FeedPreviewScreen`，它用于“订阅”页内的通用预览流，不是新增发现源时的默认模板。
 
 如果后续某个目录需要特殊预览行为，再单独拆页面。
 
@@ -360,7 +364,7 @@ WebView 借壳模式同样需要：
 
 如果从预览页还能跳高级编辑，就还要补保存后的回退分支。
 
-### 9. 预览页仍然优先复用 `PlinkFeedPreviewScreen`
+### 9. 发现源预览页仍然优先复用 `PlinkFeedPreviewScreen`
 
 网页内拦截到的结果，只要已经是标准 RSS/Atom URL，就继续复用现有预览页：
 
