@@ -14,6 +14,8 @@ import com.lengyuefenghua.newsreader.data.Article
 import com.lengyuefenghua.newsreader.data.NewsRepository
 import com.lengyuefenghua.newsreader.data.Source
 import com.lengyuefenghua.newsreader.data.SourceStat
+import com.lengyuefenghua.newsreader.data.isImportableSource
+import com.lengyuefenghua.newsreader.data.normalizeImportedSource
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -266,7 +268,6 @@ class SourceViewModel(application: Application) : AndroidViewModel(application) 
 
                     var importedCount = 0
                     var updatedCount = 0
-                    val skippedCount = validSources.size - existingByUrl.size
 
                     // 根据策略处理
                     when (strategy) {
@@ -333,21 +334,8 @@ class SourceViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     // 辅助方法：准备插入的数据
-    private fun Source.prepareForInsert() = this.copy(
+    private fun Source.prepareForInsert() = normalizeImportedSource(this).copy(
         id = 0,
-        groupName = this.groupName.trim(),
-        iconUrl = this.iconUrl ?: "",
-        isCustom = this.isCustom,
-        requestMethod = this.requestMethod,
-        enablePcUserAgent = this.enablePcUserAgent,
-        ruleList = this.ruleList ?: "",
-        ruleTitle = this.ruleTitle ?: "",
-        ruleLink = this.ruleLink ?: "",
-        ruleImage = this.ruleImage ?: "",
-        ruleSummary = this.ruleSummary ?: "",
-        ruleContent = this.ruleContent ?: "",
-        useAutoExtract = this.useAutoExtract,
-        extractionAlgorithm = this.extractionAlgorithm?.ifEmpty { "readability" } ?: "readability"
     )
 
     // 辅助方法：准备更新的数据
@@ -435,7 +423,7 @@ class SourceViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     private fun parseSources(json: String): List<Source> {
-        return try {
+        val parsedSources = try {
             // 尝试解析为列表
             val listType = object : TypeToken<List<Source>>() {}.type
             val sources = gson.fromJson<List<Source>>(json, listType)
@@ -462,6 +450,14 @@ class SourceViewModel(application: Application) : AndroidViewModel(application) 
                 emptyList()
             }
         }
+
+        val normalizedSources = parsedSources.map(::normalizeImportedSource)
+        val validSources = normalizedSources.filter(::isImportableSource)
+        val skippedCount = normalizedSources.size - validSources.size
+        if (skippedCount > 0) {
+            Log.w("SourceViewModel", "忽略了 $skippedCount 个缺少 name 或 url 的无效订阅源")
+        }
+        return validSources
     }
 
     // [修改] 保存订阅源到用户选择的文件

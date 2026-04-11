@@ -22,6 +22,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -545,6 +546,7 @@ fun NewsReaderApp() {
             ) { backStackEntry ->
                 val url = backStackEntry.arguments?.getString(NavRoutes.ARTICLE_ARG) ?: ""
                 var isInternalArticleNavigation by remember(url) { mutableStateOf(false) }
+                val latestInternalArticleNavigation = rememberUpdatedState(isInternalArticleNavigation)
                 val readingContext = ArticleReadingSession.current
                     ?.takeIf { it.articleUrls.contains(url) }
                     ?.copy(currentUrl = url)
@@ -562,7 +564,7 @@ fun NewsReaderApp() {
                 }
                 DisposableEffect(url) {
                     onDispose {
-                        if (!isInternalArticleNavigation) {
+                        if (!latestInternalArticleNavigation.value) {
                             android.util.Log.d("ArticlePullDebug", "clear session on dispose url=$url")
                             ArticleReadingSession.clear()
                         }

@@ -134,8 +134,12 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             sourceDao.deleteAll()
             articleDao.deleteAllArticles()
 
+            val normalizedSources = backupData.sources
+                .map(::normalizeImportedSource)
+                .filter(::isImportableSource)
+
             // 2. 插入订阅源（需要重置 ID 以避免冲突）
-            backupData.sources.forEach { source ->
+            normalizedSources.forEach { source ->
                 sourceDao.insert(source.copy(id = 0))
             }
 
@@ -176,7 +180,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 // 忽略错误，使用默认值
             }
 
-            val sourceCount = backupData.sources.size
+            val sourceCount = normalizedSources.size
             val articleCount = backupData.articles.size
 
             "恢复成功：$sourceCount 个订阅源，$articleCount 篇文章"

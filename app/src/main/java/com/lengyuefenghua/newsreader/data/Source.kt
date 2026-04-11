@@ -34,3 +34,41 @@ data class Source(
     // 正文提取算法：readability=Mozilla算法, gne=基于文本密度, custom=自定义选择器
     @SerializedName("extractionAlgorithm") val extractionAlgorithm: String = "readability"
 ) : Serializable
+
+internal fun normalizeImportedSource(source: Source): Source {
+    val normalizedRuleContent = normalizeSourceText(source.ruleContent)
+    val normalizedUseAutoExtract = source.useAutoExtract
+    val normalizedExtractionAlgorithm = normalizeSourceText(source.extractionAlgorithm)
+        .ifBlank {
+            if (normalizedUseAutoExtract && normalizedRuleContent.isNotBlank()) {
+                "custom"
+            } else {
+                "readability"
+            }
+        }
+
+    return Source(
+        id = source.id,
+        name = normalizeSourceText(source.name),
+        url = normalizeSourceText(source.url),
+        groupName = normalizeSourceText(source.groupName),
+        iconUrl = normalizeSourceText(source.iconUrl),
+        isCustom = source.isCustom,
+        requestMethod = source.requestMethod,
+        enablePcUserAgent = source.enablePcUserAgent,
+        ruleList = normalizeSourceText(source.ruleList),
+        ruleTitle = normalizeSourceText(source.ruleTitle),
+        ruleLink = normalizeSourceText(source.ruleLink),
+        ruleImage = normalizeSourceText(source.ruleImage),
+        ruleSummary = normalizeSourceText(source.ruleSummary),
+        ruleContent = normalizedRuleContent,
+        useAutoExtract = normalizedUseAutoExtract,
+        extractionAlgorithm = normalizedExtractionAlgorithm,
+    )
+}
+
+internal fun isImportableSource(source: Source): Boolean {
+    return normalizeSourceText(source.name).isNotBlank() && normalizeSourceText(source.url).isNotBlank()
+}
+
+private fun normalizeSourceText(value: String?): String = value?.trim().orEmpty()
