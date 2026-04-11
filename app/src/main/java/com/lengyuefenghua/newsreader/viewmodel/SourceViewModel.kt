@@ -2,6 +2,7 @@ package com.lengyuefenghua.newsreader.viewmodel
 
 import android.app.Application
 import android.content.Context
+import android.icu.text.Transliterator
 import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
@@ -14,13 +15,17 @@ import com.lengyuefenghua.newsreader.data.NewsRepository
 import com.lengyuefenghua.newsreader.data.Source
 import com.lengyuefenghua.newsreader.data.SourceStat
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.text.Normalizer
+import java.util.Locale
 
 // [新增] 导入结果数据类
 data class ImportResult(
@@ -46,6 +51,26 @@ data class SourceWithStat(
     val read: Int = 0
 )
 
+data class IndexedSourceWithStat(
+    val item: SourceWithStat,
+    val groupName: String,
+    val sortName: String,
+    val indexLetter: String,
+    val searchText: String
+)
+
+data class SourceGroup(
+    val name: String,
+    val sources: List<IndexedSourceWithStat>
+)
+
+data class SourceManagerUiState(
+    val groupedSources: List<SourceGroup> = emptyList(),
+    val visibleSources: List<SourceWithStat> = emptyList(),
+    val indexLetters: List<String> = emptyList(),
+    val availableGroups: List<String> = emptyList()
+)
+
 class SourceViewModel(application: Application) : AndroidViewModel(application) {
 
     private val app = application as NewsReaderApplication
@@ -59,6 +84,9 @@ class SourceViewModel(application: Application) : AndroidViewModel(application) 
         .setPrettyPrinting()
         .setLenient()  // 宽松解析，允许注释、单引号等
         .create()
+
+    private val _searchQuery = MutableStateFlow("")
+    val searchQuery = _searchQuery.asStateFlow()
 
     // [修改] 合并 Source 和 Stat 流
     val sourcesWithStats: StateFlow<List<SourceWithStat>> = combine(
@@ -77,8 +105,55 @@ class SourceViewModel(application: Application) : AndroidViewModel(application) 
         initialValue = emptyList()
     )
 
+    val sourceManagerUiState: StateFlow<SourceManagerUiState> = combine(
+        sourcesWithStats,
+        _searchQuery
+    ) { sources, query ->
+        buildSourceManagerUiState(sources, query)
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = SourceManagerUiState()
+    )
+
     fun addSource(source: Source) {
         viewModelScope.launch { dao.insert(source) }
+    }
+
+    fun updateSearchQuery(query: String) {
+        _searchQuery.value = query
+    }
+
+    fun updateSourceGroup(source: Source, groupName: String) {
+        viewModelScope.launch {
+            dao.update(source.copy(groupName = groupName.trim()))
+        }
+    }
+
+    fun renameGroup(oldGroupName: String, newGroupName: String) {
+        val normalizedOldGroupName = oldGroupName.trim()
+        val normalizedNewGroupName = newGroupName.trim()
+
+        if (
+            normalizedNewGroupName.isBlank() ||
+            normalizedOldGroupName == normalizedNewGroupName
+        ) {
+            return
+        }
+
+        viewModelScope.launch(Dispatchers.IO) {
+            dao.getAllSources().first()
+                .filter { source ->
+                    if (normalizedOldGroupName == DEFAULT_GROUP_NAME) {
+                        source.groupName.trim().isBlank()
+                    } else {
+                        source.groupName.trim() == normalizedOldGroupName
+                    }
+                }
+                .forEach { source ->
+                    dao.update(source.copy(groupName = normalizedNewGroupName))
+                }
+        }
     }
 
     fun deleteSource(source: Source) {
@@ -260,6 +335,7 @@ class SourceViewModel(application: Application) : AndroidViewModel(application) 
     // 辅助方法：准备插入的数据
     private fun Source.prepareForInsert() = this.copy(
         id = 0,
+        groupName = this.groupName.trim(),
         iconUrl = this.iconUrl ?: "",
         isCustom = this.isCustom,
         requestMethod = this.requestMethod,
@@ -276,6 +352,87 @@ class SourceViewModel(application: Application) : AndroidViewModel(application) 
 
     // 辅助方法：准备更新的数据
     private fun Source.prepareForUpdate(existingId: Int) = this.prepareForInsert().copy(id = existingId)
+
+    private fun buildSourceManagerUiState(
+        sources: List<SourceWithStat>,
+        query: String
+    ): SourceManagerUiState {
+        val indexedSources = sources.map(::toIndexedSource)
+        val normalizedQuery = query.trim().lowercase(Locale.getDefault())
+
+        val filteredSources = if (normalizedQuery.isBlank()) {
+            indexedSources
+        } else {
+            indexedSources.filter { it.searchText.contains(normalizedQuery) }
+        }
+
+        val groupedSources = filteredSources
+            .groupBy { it.groupName }
+            .toSortedMap(groupComparator)
+            .map { (groupName, groupSources) ->
+                SourceGroup(
+                    name = groupName,
+                    sources = groupSources.sortedWith(indexedSourceComparator)
+                )
+            }
+
+        val indexLetters = filteredSources
+            .map { it.indexLetter }
+            .distinct()
+            .sortedWith(indexLetterComparator)
+
+        val availableGroups = indexedSources
+            .map { it.groupName }
+            .filter { it.isNotBlank() }
+            .distinct()
+            .sortedWith(groupNameComparator)
+
+        return SourceManagerUiState(
+            groupedSources = groupedSources,
+            visibleSources = groupedSources.flatMap { group -> group.sources.map { it.item } },
+            indexLetters = indexLetters,
+            availableGroups = availableGroups
+        )
+    }
+
+    private fun toIndexedSource(sourceWithStat: SourceWithStat): IndexedSourceWithStat {
+        val normalizedGroupName = sourceWithStat.source.groupName.trim()
+        val sortName = normalizeForSearch(sourceWithStat.source.name)
+        val displayGroup = normalizedGroupName.ifBlank { DEFAULT_GROUP_NAME }
+
+        return IndexedSourceWithStat(
+            item = sourceWithStat,
+            groupName = displayGroup,
+            sortName = sortName,
+            indexLetter = extractIndexLetter(sortName),
+            searchText = listOf(
+                sourceWithStat.source.name,
+                sourceWithStat.source.url,
+                displayGroup,
+                sortName
+            ).joinToString("\n").lowercase(Locale.getDefault())
+        )
+    }
+
+    private fun normalizeForSearch(text: String): String {
+        val transliterated = transliterator.transliterate(text)
+        val withoutMarks = Normalizer.normalize(transliterated, Normalizer.Form.NFD)
+            .replace(COMBINING_MARKS_REGEX, "")
+
+        return withoutMarks
+            .replace(NON_ALPHANUMERIC_REGEX, " ")
+            .trim()
+            .lowercase(Locale.getDefault())
+    }
+
+    private fun extractIndexLetter(sortName: String): String {
+        val firstLetter = sortName.firstOrNull { it.isLetter() }
+        return firstLetter
+            ?.uppercaseChar()
+            ?.takeIf { it in 'A'..'Z' }
+            ?.toString()
+            ?: "#"
+    }
 
     private fun parseSources(json: String): List<Source> {
         return try {
@@ -329,5 +486,44 @@ class SourceViewModel(application: Application) : AndroidViewModel(application) 
             Log.e("SourceViewModel", "备份失败", e)
             "备份失败: ${e.message}"
         }
+    }
+
+    companion object {
+        const val DEFAULT_GROUP_NAME = "未分组"
+
+        private val transliterator: Transliterator by lazy {
+            Transliterator.getInstance("Any-Latin; Latin-ASCII")
+        }
+
+        private val COMBINING_MARKS_REGEX = Regex("\\p{InCombiningDiacriticalMarks}+")
+        private val NON_ALPHANUMERIC_REGEX = Regex("[^a-zA-Z0-9]+")
+
+        private val indexedSourceComparator =
+            compareBy<IndexedSourceWithStat>({ it.indexLetter == "#" }, { it.sortName }, { it.item.source.name.lowercase(Locale.getDefault()) })
+
+        private val groupNameComparator =
+            compareBy<String>({ normalizeLabel(it) })
+
+        private val groupComparator = Comparator<String> { left, right ->
+            when {
+                left == DEFAULT_GROUP_NAME && right != DEFAULT_GROUP_NAME -> -1
+                left != DEFAULT_GROUP_NAME && right == DEFAULT_GROUP_NAME -> 1
+                else -> groupNameComparator.compare(left, right)
+            }
+        }
+
+        private val indexLetterComparator = Comparator<String> { left, right ->
+            when {
+                left == right -> 0
+                left == "#" -> 1
+                right == "#" -> -1
+                else -> left.compareTo(right)
+            }
+        }
+
+        private fun normalizeLabel(value: String): String =
+            Normalizer.normalize(value, Normalizer.Form.NFD)
+                .replace(COMBINING_MARKS_REGEX, "")
+                .lowercase(Locale.getDefault())
     }
 }

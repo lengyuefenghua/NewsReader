@@ -73,9 +73,9 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         val backupDate = dateFormat.format(Date())
 
         BackupData(
-            version = "2.1", // 更新版本号以支持新字段
+            version = "2.2", // 更新版本号以支持新字段
             backupDate = backupDate,
-            databaseVersion = 10, // 当前数据库版本
+            databaseVersion = 11, // 当前数据库版本
             sources = sources,
             articles = articles,
             settings = BackupSettings(

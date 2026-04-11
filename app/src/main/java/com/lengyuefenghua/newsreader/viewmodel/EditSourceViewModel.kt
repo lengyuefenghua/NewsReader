@@ -17,6 +17,7 @@ class EditSourceViewModel(private val sourceDao: SourceDao) : ViewModel() {
     // --- 表单状态 (使用 mutableStateOf 以便 Compose 监听) ---
     var name by mutableStateOf("")
     var url by mutableStateOf("")
+    var groupName by mutableStateOf("")
 
     // 0=RSS/混合, 1=完全自定义
     var selectedTab by mutableIntStateOf(0)
@@ -52,6 +53,7 @@ class EditSourceViewModel(private val sourceDao: SourceDao) : ViewModel() {
             currentId = -1
             name = initialName
             url = initialUrl
+            groupName = ""
             isDataLoaded = true
             return
         }
@@ -64,6 +66,7 @@ class EditSourceViewModel(private val sourceDao: SourceDao) : ViewModel() {
                 currentId = source.id
                 name = source.name
                 url = source.url
+                groupName = source.groupName
 
                 // 恢复模式选择
                 selectedTab = if (source.isCustom) 1 else 0
@@ -93,6 +96,7 @@ class EditSourceViewModel(private val sourceDao: SourceDao) : ViewModel() {
             id = if (currentId == -1) 0 else currentId,
             name = name,
             url = url,
+            groupName = groupName,
             isCustom = (selectedTab == 1),
             requestMethod = requestMethod,
             enablePcUserAgent = enablePcUserAgent,

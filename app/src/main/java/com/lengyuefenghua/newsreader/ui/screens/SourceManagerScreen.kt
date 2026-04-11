@@ -7,6 +7,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,15 +16,21 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.DriveFileMove
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
@@ -30,10 +38,12 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.RemoveDone
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
@@ -51,12 +61,14 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -70,23 +82,25 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.lengyuefenghua.newsreader.R
 import com.lengyuefenghua.newsreader.core.navigation.NavRoutes
-import java.io.BufferedReader
 import com.lengyuefenghua.newsreader.data.Source
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import com.lengyuefenghua.newsreader.viewmodel.IndexedSourceWithStat
 import com.lengyuefenghua.newsreader.viewmodel.SourceViewModel
+import com.lengyuefenghua.newsreader.viewmodel.SourceGroup
 import com.lengyuefenghua.newsreader.viewmodel.SourceWithStat
 import com.lengyuefenghua.newsreader.viewmodel.ImportStrategy
-import com.lengyuefenghua.newsreader.viewmodel.ImportResult
 import com.lengyuefenghua.newsreader.viewmodel.FeedPreviewViewModel
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun SourceManagerScreen(
     viewModel: SourceViewModel = viewModel(),
@@ -96,9 +110,13 @@ fun SourceManagerScreen(
     onSourceClick: (Int) -> Unit = {},
     onOpenFeedPreview: () -> Unit = {}
 ) {
-    val sourceItems by viewModel.sourcesWithStats.collectAsState()
+    val uiState by viewModel.sourceManagerUiState.collectAsState()
+    val sourceItems = uiState.visibleSources
+    val groupedSources = uiState.groupedSources
+    val searchQuery by viewModel.searchQuery.collectAsState()
     val context = LocalContext.current
     val clipboardManager = LocalClipboardManager.current
+    val listState = rememberLazyListState()
 
     var isSelectionMode by remember { mutableStateOf(false) }
     val selectedIds = remember { mutableStateListOf<Int>() }
@@ -109,7 +127,28 @@ fun SourceManagerScreen(
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
     var sourceToDelete by remember { mutableStateOf<Source?>(null) }
     var sourcesToDelete by remember { mutableStateOf<List<Source>?>(null) }
+    var sourceToMove by remember { mutableStateOf<Source?>(null) }
+    var groupToRename by remember { mutableStateOf<String?>(null) }
+    val collapsedGroups = remember { mutableStateListOf<String>() }
     val coroutineScope = rememberCoroutineScope()
+    val collapsedGroupSet = collapsedGroups.toSet()
+    val visibleEntries = remember(groupedSources, collapsedGroupSet) {
+        buildVisibleSourceEntries(groupedSources, collapsedGroupSet)
+    }
+    val availableLetters = remember(visibleEntries) {
+        visibleEntries.mapNotNull { entry ->
+            (entry as? SourceListEntry.Item)?.indexedItem?.indexLetter
+        }.toSet()
+    }
+    val alphabetIndexTargets = remember(visibleEntries) { buildAlphabetIndexTargets(visibleEntries) }
+    val currentIndexLetter by remember(listState, visibleEntries) {
+        derivedStateOf {
+            findCurrentIndexLetter(
+                firstVisibleItemIndex = listState.firstVisibleItemIndex,
+                entries = visibleEntries
+            )
+        }
+    }
 
     // [新增] 导入策略选择
     var showImportStrategyDialog by remember { mutableStateOf(false) }
@@ -121,7 +160,6 @@ fun SourceManagerScreen(
     ) { uri: Uri? ->
         if (uri != null) {
             coroutineScope.launch {
-                val selectedSources = sourceItems.filter { it.source.id in selectedIds }.map { it.source }
                 val message = viewModel.saveToFile(uri, context)
                 Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
                 isSelectionMode = false
@@ -258,9 +296,26 @@ fun SourceManagerScreen(
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
                 )
             } else {
-                TopAppBar(
-                    title = { Text("订阅源管理") }
-                )
+                Surface(shadowElevation = 2.dp) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "订阅源管理",
+                            style = MaterialTheme.typography.titleLarge,
+                            maxLines = 1
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        CompactSearchField(
+                            value = searchQuery,
+                            onValueChange = viewModel::updateSearchQuery,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
             }
         },
         floatingActionButton = {
@@ -273,74 +328,157 @@ fun SourceManagerScreen(
     ) { innerPadding ->
         if (sourceItems.isEmpty()) {
             Box(
-                modifier = Modifier.fillMaxSize().padding(innerPadding),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
                 contentAlignment = Alignment.Center
             ) {
-                Text("暂无订阅源，点击右下角添加")
+                Text(if (searchQuery.isBlank()) "暂无订阅源，点击右下角添加" else "未找到匹配的订阅源")
             }
         } else {
-            LazyColumn(
-                // [修改点] 将 left 改为 start，将 right 改为 end
-                contentPadding = PaddingValues(
-                    top = innerPadding.calculateTopPadding(),
-                    start = 16.dp,
-                    end = 16.dp,
-                    bottom = innerPadding.calculateBottomPadding() + 88.dp // 留出 FAB 空间
-                ),
-                modifier = Modifier.fillMaxSize()
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(top = innerPadding.calculateTopPadding())
             ) {
-                items(sourceItems) { item ->
-                    val isSelected = selectedIds.contains(item.source.id)
-                    SourceItem(
-                        item = item,
-                        isSelectionMode = isSelectionMode,
-                        isSelected = isSelected,
-                        onDelete = {
-                            sourceToDelete = item.source
-                            showDeleteConfirmDialog = true
-                        },
-                        onEdit = { onEditSource(item.source.id) },
-                        onUpdate = {
-                            Toast.makeText(
-                                context,
-                                "开始更新: ${item.source.name}",
-                                Toast.LENGTH_SHORT
-                            ).show()
-                            viewModel.syncSource(item.source.id) {
-                                android.os.Handler(android.os.Looper.getMainLooper()).post {
-                                    Toast.makeText(
-                                        context,
-                                        "${item.source.name} 更新完成",
-                                        Toast.LENGTH_SHORT
-                                    ).show()
-                                }
-                            }
-                        },
-                        onShare = {
-                            val json = viewModel.exportSourceToJson(item.source)
-                            clipboardManager.setText(AnnotatedString(json))
-                            Toast.makeText(context, "已复制到剪贴板", Toast.LENGTH_SHORT).show()
-                        },
-                        onMarkAllRead = { viewModel.markAllAsRead(item.source.name) },
-                        onMarkAllUnread = { viewModel.markAllAsUnread(item.source.name) },
-                        onLongClick = {
-                            if (!isSelectionMode) {
-                                isSelectionMode = true
-                                selectedIds.add(item.source.id)
-                            }
-                        },
-                        onClick = {
-                            if (isSelectionMode) {
-                                if (isSelected) selectedIds.remove(item.source.id) else selectedIds.add(
-                                    item.source.id
+                AlphabetIndexSidebar(
+                    letters = ALPHABET_INDEX_LETTERS,
+                    availableLetters = availableLetters,
+                    currentLetter = currentIndexLetter,
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .padding(start = 4.dp, top = 12.dp, bottom = 96.dp),
+                    onLetterClick = { letter ->
+                        val targetIndex = alphabetIndexTargets[letter] ?: return@AlphabetIndexSidebar
+                        coroutineScope.launch {
+                            listState.animateScrollToItem(targetIndex)
+                        }
+                    }
+                )
+
+                LazyColumn(
+                    state = listState,
+                    contentPadding = PaddingValues(
+                        top = 8.dp,
+                        start = 12.dp,
+                        end = 16.dp,
+                        bottom = innerPadding.calculateBottomPadding() + 88.dp
+                    ),
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                ) {
+                    groupedSources.forEach { group ->
+                        val isCollapsed = group.name in collapsedGroupSet
+                        stickyHeader(key = "header_${group.name}") {
+                            SourceGroupHeader(
+                                groupName = group.name,
+                                count = group.sources.size,
+                                isCollapsed = isCollapsed,
+                                canRename = true,
+                                onToggle = {
+                                    if (isCollapsed) {
+                                        collapsedGroups.remove(group.name)
+                                    } else {
+                                        collapsedGroups.add(group.name)
+                                    }
+                                },
+                                onRename = { groupToRename = group.name }
+                            )
+                        }
+                        if (!isCollapsed) {
+                            items(group.sources, key = { it.item.source.id }) { indexedItem ->
+                                val item = indexedItem.item
+                                val isSelected = selectedIds.contains(item.source.id)
+
+                                SourceItem(
+                                    item = item,
+                                    groupLabel = group.name,
+                                    isSelectionMode = isSelectionMode,
+                                    isSelected = isSelected,
+                                    onDelete = {
+                                        sourceToDelete = item.source
+                                        showDeleteConfirmDialog = true
+                                    },
+                                    onEdit = { onEditSource(item.source.id) },
+                                    onMoveToGroup = { sourceToMove = item.source },
+                                    onUpdate = {
+                                        Toast.makeText(
+                                            context,
+                                            "开始更新: ${item.source.name}",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                        viewModel.syncSource(item.source.id) {
+                                            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                                                Toast.makeText(
+                                                    context,
+                                                    "${item.source.name} 更新完成",
+                                                    Toast.LENGTH_SHORT
+                                                ).show()
+                                            }
+                                        }
+                                    },
+                                    onShare = {
+                                        val json = viewModel.exportSourceToJson(item.source)
+                                        clipboardManager.setText(AnnotatedString(json))
+                                        Toast.makeText(context, "已复制到剪贴板", Toast.LENGTH_SHORT).show()
+                                    },
+                                    onMarkAllRead = { viewModel.markAllAsRead(item.source.name) },
+                                    onMarkAllUnread = { viewModel.markAllAsUnread(item.source.name) },
+                                    onLongClick = {
+                                        if (!isSelectionMode) {
+                                            isSelectionMode = true
+                                            selectedIds.add(item.source.id)
+                                        }
+                                    },
+                                    onClick = {
+                                        if (isSelectionMode) {
+                                            if (isSelected) selectedIds.remove(item.source.id) else selectedIds.add(
+                                                item.source.id
+                                            )
+                                        } else {
+                                            onSourceClick(item.source.id)
+                                        }
+                                    }
                                 )
-                            } else {
-                                onSourceClick(item.source.id)
                             }
                         }
-                    )
+                    }
                 }
             }
+        }
+
+        groupToRename?.let { groupName ->
+            RenameGroupDialog(
+                title = if (groupName == SourceViewModel.DEFAULT_GROUP_NAME) "为未分组创建分组" else "重命名分组",
+                initialGroupName = if (groupName == SourceViewModel.DEFAULT_GROUP_NAME) "" else groupName,
+                onDismiss = { groupToRename = null },
+                onConfirm = { newGroupName ->
+                    val oldGroupName = groupName
+                    viewModel.renameGroup(oldGroupName, newGroupName)
+
+                    if (oldGroupName in collapsedGroups) {
+                        collapsedGroups.remove(oldGroupName)
+                        if (newGroupName !in collapsedGroups) {
+                            collapsedGroups.add(newGroupName)
+                        }
+                    }
+
+                    groupToRename = null
+                }
+            )
+        }
+
+        sourceToMove?.let { source ->
+            MoveSourceGroupDialog(
+                source = source,
+                existingGroups = uiState.availableGroups,
+                onDismiss = { sourceToMove = null },
+                onConfirm = { groupName ->
+                    viewModel.updateSourceGroup(source, groupName)
+                    sourceToMove = null
+                }
+            )
         }
 
         // [新增] 导入策略选择对话框
@@ -492,10 +630,12 @@ fun SourceManagerScreen(
 @Composable
 fun SourceItem(
     item: SourceWithStat,
+    groupLabel: String,
     isSelectionMode: Boolean,
     isSelected: Boolean,
     onDelete: () -> Unit,
     onEdit: () -> Unit,
+    onMoveToGroup: () -> Unit,
     onUpdate: () -> Unit,
     onShare: () -> Unit,
     onMarkAllRead: () -> Unit,
@@ -546,6 +686,11 @@ fun SourceItem(
             ) {
                 Text(text = source.name, style = MaterialTheme.typography.titleMedium)
                 Text(text = source.url, style = MaterialTheme.typography.bodySmall, maxLines = 1)
+                Text(
+                    text = "分组：$groupLabel",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.outline
+                )
 
                 val unread = item.total - item.read
                 Text(
@@ -580,6 +725,11 @@ fun SourceItem(
                             onClick = { showMenu = false; onMarkAllUnread() },
                             leadingIcon = { Icon(Icons.Default.RemoveDone, null) },
                             modifier = Modifier.semantics { contentDescription = descMarkAllUnread }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("移动分组") },
+                            onClick = { showMenu = false; onMoveToGroup() },
+                            leadingIcon = { Icon(Icons.AutoMirrored.Filled.DriveFileMove, null) }
                         )
                         HorizontalDivider()
                         DropdownMenuItem(
@@ -617,6 +767,331 @@ fun SourceItem(
         }
     }
 }
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun CompactSearchField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+    val secondaryContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+
+    Row(
+        modifier = modifier
+            .height(40.dp)
+            .background(
+                color = containerColor,
+                shape = RoundedCornerShape(10.dp)
+            )
+            .padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            Icons.Default.Search,
+            contentDescription = "搜索订阅源",
+            tint = secondaryContentColor,
+            modifier = Modifier.size(18.dp)
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        BasicTextField(
+            value = value,
+            onValueChange = onValueChange,
+            singleLine = true,
+            textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
+            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+            modifier = Modifier.weight(1f),
+            decorationBox = { innerTextField ->
+                if (value.isEmpty()) {
+                    Text(
+                        text = "搜索订阅源...",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = secondaryContentColor
+                    )
+                }
+                innerTextField()
+            }
+        )
+        if (value.isNotEmpty()) {
+            IconButton(
+                onClick = { onValueChange("") },
+                modifier = Modifier.size(24.dp)
+            ) {
+                Icon(
+                    Icons.Default.Close,
+                    contentDescription = "清空搜索",
+                    modifier = Modifier.size(16.dp),
+                    tint = secondaryContentColor
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun SourceGroupHeader(
+    groupName: String,
+    count: Int,
+    isCollapsed: Boolean,
+    canRename: Boolean,
+    onToggle: () -> Unit,
+    onRename: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(MaterialTheme.colorScheme.surface)
+            .combinedClickable(
+                onClick = onToggle,
+                onLongClick = {
+                    if (canRename) {
+                        onRename()
+                    }
+                }
+            )
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = if (isCollapsed) Icons.AutoMirrored.Filled.KeyboardArrowRight else Icons.Default.KeyboardArrowDown,
+                contentDescription = if (isCollapsed) "展开分组" else "折叠分组",
+                tint = MaterialTheme.colorScheme.primary
+            )
+            Spacer(modifier = Modifier.width(4.dp))
+            Text(
+                text = "$groupName ($count)",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun AlphabetIndexSidebar(
+    letters: List<String>,
+    availableLetters: Set<String>,
+    currentLetter: String?,
+    modifier: Modifier = Modifier,
+    onLetterClick: (String) -> Unit
+) {
+    Column(
+        modifier = modifier.width(24.dp),
+        verticalArrangement = Arrangement.SpaceEvenly,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        letters.forEach { letter ->
+            val enabled = letter in availableLetters
+            val isCurrent = letter == currentLetter
+            Text(
+                text = letter,
+                style = MaterialTheme.typography.labelSmall,
+                color = when {
+                    isCurrent -> MaterialTheme.colorScheme.onPrimaryContainer
+                    enabled -> MaterialTheme.colorScheme.primary
+                    else -> MaterialTheme.colorScheme.outline
+                },
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .width(20.dp)
+                    .background(
+                        color = if (isCurrent) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+                        shape = androidx.compose.foundation.shape.CircleShape
+                    )
+                    .clickable(enabled = enabled) { onLetterClick(letter) }
+                    .padding(vertical = 2.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun RenameGroupDialog(
+    title: String,
+    initialGroupName: String,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit
+) {
+    var groupName by remember(initialGroupName) { mutableStateOf(initialGroupName) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            OutlinedTextField(
+                value = groupName,
+                onValueChange = { groupName = it },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                label = { Text("新的分组名称") }
+            )
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onConfirm(groupName.trim()) },
+                enabled = groupName.trim().isNotBlank()
+            ) {
+                Text("保存")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("取消")
+            }
+        }
+    )
+}
+
+@Composable
+private fun MoveSourceGroupDialog(
+    source: Source,
+    existingGroups: List<String>,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit
+) {
+    var groupName by remember(source.id, source.groupName) { mutableStateOf(source.groupName) }
+    val recommendedGroups = remember(existingGroups, source.groupName) {
+        existingGroups.filter { it != source.groupName.trim() }.take(8)
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("移动到分组") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("为「${source.name}」设置分组名称，留空表示未分组。")
+                OutlinedTextField(
+                    value = groupName,
+                    onValueChange = { groupName = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    label = { Text("分组名称") },
+                    placeholder = { Text("例如：技术、资讯、播客") }
+                )
+                if (recommendedGroups.isNotEmpty()) {
+                    Text(
+                        text = "已有分组",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                    recommendedGroups.forEach { group ->
+                        Text(
+                            text = group,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.clickable { groupName = group }
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(groupName.trim()) }) {
+                Text("保存")
+            }
+        },
+        dismissButton = {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (source.groupName.isNotBlank()) {
+                    TextButton(onClick = { onConfirm("") }) {
+                        Text("移出分组")
+                    }
+                }
+                TextButton(onClick = onDismiss) {
+                    Text("取消")
+                }
+            }
+        }
+    )
+}
+
+private fun buildAlphabetIndexTargets(entries: List<SourceListEntry>): Map<String, Int> {
+    val indexMap = linkedMapOf<String, Int>()
+    entries.forEachIndexed { index, entry ->
+        if (entry is SourceListEntry.Item) {
+            indexMap.putIfAbsent(entry.indexedItem.indexLetter, index)
+        }
+    }
+    return indexMap
+}
+
+private fun buildVisibleSourceEntries(
+    groups: List<SourceGroup>,
+    collapsedGroups: Set<String>
+): List<SourceListEntry> {
+    val entries = mutableListOf<SourceListEntry>()
+
+    groups.forEach { group ->
+        val isCollapsed = group.name in collapsedGroups
+        entries.add(
+            SourceListEntry.Header(
+                groupName = group.name,
+                count = group.sources.size,
+                isCollapsed = isCollapsed
+            )
+        )
+        if (!isCollapsed) {
+            group.sources.forEach { indexedItem ->
+                entries.add(
+                    SourceListEntry.Item(
+                        groupName = group.name,
+                        indexedItem = indexedItem
+                    )
+                )
+            }
+        }
+    }
+
+    return entries
+}
+
+private fun findCurrentIndexLetter(
+    firstVisibleItemIndex: Int,
+    entries: List<SourceListEntry>
+): String? {
+    if (entries.isEmpty()) {
+        return null
+    }
+
+    val safeStartIndex = firstVisibleItemIndex.coerceIn(0, entries.lastIndex)
+
+    for (index in safeStartIndex..entries.lastIndex) {
+        val entry = entries[index]
+        if (entry is SourceListEntry.Item) {
+            return entry.indexedItem.indexLetter
+        }
+    }
+
+    for (index in safeStartIndex downTo 0) {
+        val entry = entries[index]
+        if (entry is SourceListEntry.Item) {
+            return entry.indexedItem.indexLetter
+        }
+    }
+
+    return null
+}
+
+private sealed interface SourceListEntry {
+    data class Header(
+        val groupName: String,
+        val count: Int,
+        val isCollapsed: Boolean
+    ) : SourceListEntry
+
+    data class Item(
+        val groupName: String,
+        val indexedItem: IndexedSourceWithStat
+    ) : SourceListEntry
+}
+
+private val ALPHABET_INDEX_LETTERS = ('A'..'Z').map { it.toString() } + "#"
 
 // [修复] 还原为横向布局，左侧功能，右侧操作
 @Composable

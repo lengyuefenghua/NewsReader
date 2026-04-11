@@ -10,6 +10,7 @@ data class Source(
     @PrimaryKey(autoGenerate = true) @SerializedName("id") val id: Int = 0,
     @SerializedName("name") val name: String,
     @SerializedName("url") val url: String,
+    @SerializedName("groupName") val groupName: String = "",
     @SerializedName("iconUrl") val iconUrl: String? = null, // [新增] 订阅源图标
 
     // --- 模式: 是否为完全自定义列表抓取 ---
